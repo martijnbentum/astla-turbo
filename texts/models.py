@@ -43,6 +43,7 @@ class Session(models.Model):
     ncorrect = models.IntegerField(default = 0)
     nwords= models.IntegerField(default=0)
     align = models.TextField(default='')
+    dataset = models.TextField(default='')
 
     def __repr__(self):
         return self.word_list + ' ' + str(self.ncorrect)
@@ -54,6 +55,7 @@ class Word(models.Model):
     index = models.IntegerField(default=0)
     correct= models.IntegerField(default=0)
     audio_url = models.CharField(max_length= 1000, default = '') 
+    audio_filename = models.CharField(max_length= 1000, default = '') 
     word = models.CharField(max_length= 100, default = '') 
     gt_aligned_word = models.CharField(max_length= 100, default = '') 
     hyp_aligned_word = models.CharField(max_length= 100, default = '') 
