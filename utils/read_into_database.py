@@ -83,6 +83,7 @@ def to_word_instance(session,index,word, gt_aligned_word,
     d['word'] = word
     d['index'] = index 
     d['audio_url'] = session.audio_url
+    d['audio_filename'] = session.audio_filename
     d['correct'] = int(cl[index])
     d['gt_aligned_word']= gt_aligned_word
     d['hyp_aligned_word'] = hyp_aligned_word
