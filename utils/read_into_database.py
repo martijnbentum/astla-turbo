@@ -15,12 +15,12 @@ def load_all_simple(data = None):
     schools = handle_dart_excel.get_all_schools(data)
     [load_school(school) for school in schools]
 
-def load_all_sessions(data = None):
+def load_all_dart_sessions(data = None):
     if not data:
         _, header, data = handle_dart_excel.open_dart_excel()
     urls = handle_dart_excel.audio_urls(data)
     for url in urls:
-        load_session(url,data)
+        load_dart_session(url,data)
 
 def _load_simple(identifier, model):
     try: instance = model.objects.get(identifier = identifier)
@@ -40,7 +40,7 @@ def load_teacher(identifier):
 def load_school(identifier):
     return _load_simple(identifier, School)
 
-def load_session(url,data):
+def load_dart_session(url,data):
     d = {}
     s = handle_dart_excel.url_to_session_list(url,data)
     try: instance = Session.objects.get(audio_url = url)
@@ -61,7 +61,7 @@ def load_session(url,data):
         school_id = handle_dart_excel.get_school(s[0])
         d['school']= School.objects.get(identifier = school_id)
         d['audio_filename'] = url.split('/')[-1]
-        d['audio_url'] = url
+        d['identifier'] = url
         d['duration'] = handle_dart_excel.get_duration(s[0])
         d['list_id'] = handle_dart_excel.get_list_id(s[0])
         d['set_id'] = handle_dart_excel.get_set_id(s[0])
@@ -70,6 +70,8 @@ def load_session(url,data):
         d['test_type'] = handle_dart_excel.get_test_type(s[0])
         d['exercise'] = handle_dart_excel.get_exercise(s[0])
         d['info'] = str(s)
+        d['dataset'] = 'dart'
+        d['correct_available'] = True
         instance = Session(**d)
         instance.save()
     else:print(instance, 'already exists')
@@ -97,3 +99,35 @@ def to_word_instance(session,index,word, gt_aligned_word,
     try:w.save()
     except IntegrityError: print(word, 'already exists doing nothing')
     else: print(word, 'saved to database')
+
+
+def load_zwijsen_session(audio_filename):
+    o = audio_filename_to_session_info(audio_filename):
+    identifier, audio, info_dict, prompt, word_list = o
+    wl = word_list
+    d = {}
+    s = handle_dart_excel.url_to_session_list(url,data)
+    try: instance = Session.objects.get(audio_url = url)
+    except Session.DoesNotExist:
+        print('creating a session', identifier)
+        d['nwords'] = len(wl) 
+        d['word_list'] = ','.join(wl)
+        pupil_id = info_dict['pupil_id']
+        d['pupil'] = Pupil.objects.get(identifier = pupil_id)
+        d['audio_filename'] = audio_filename.split('/')[-1]
+        d['identifier'] = identifier
+        d['duration'] = audio.seconds
+        d['list_id'] = handle_dart_excel.get_list_id(s[0])
+        d['set_id'] = handle_dart_excel.get_set_id(s[0])
+        d['page_id'] = handle_dart_excel.get_page_id(s[0])
+        d['condition'] = handle_dart_excel.get_condition(s[0])
+        d['test_type'] = handle_dart_excel.get_test_type(s[0])
+        d['exercise'] = handle_dart_excel.get_exercise(s[0])
+        d['info'] = str(info_dict)
+        d['dataset'] = 'zwijsen'
+        d['correct_available'] = False
+        instance = Session(**d)
+        instance.save()
+    else:print(instance, 'already exists')
+    return instance
+
