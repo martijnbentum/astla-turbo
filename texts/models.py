@@ -29,7 +29,7 @@ class Session(models.Model):
     teacher = models.ForeignKey(Teacher,**dargs)
     school = models.ForeignKey(School,**dargs)
     audio_filename = models.CharField(max_length= 300) 
-    audio_url = models.CharField(max_length=1000, unique = True)
+    identifier = models.CharField(max_length=1000, unique = True)
     duration = models.IntegerField(default=0)
     list_id = models.IntegerField(default=0)
     set_id = models.CharField(max_length = 30, default = '')
@@ -38,12 +38,13 @@ class Session(models.Model):
     test_type= models.CharField(max_length= 30, default = '') 
     exercise= models.IntegerField(default=0) 
     info= models.TextField(default = '')
+    correct_available = models.BooleanField(null=True)
     all_correct = models.BooleanField(null=True)
     all_incorrect = models.BooleanField(null=True)
     ncorrect = models.IntegerField(default = 0)
     nwords= models.IntegerField(default=0)
     align = models.TextField(default='')
-    dataset = models.TextField(default='')
+    dataset = models.CharField(max_length=50,default='')
 
     def __repr__(self):
         return self.word_list + ' ' + str(self.ncorrect)
