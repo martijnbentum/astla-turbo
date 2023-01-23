@@ -45,6 +45,7 @@ class Session(models.Model):
     nwords= models.IntegerField(default=0)
     align = models.TextField(default='')
     dataset = models.CharField(max_length=50,default='')
+    multiple_dart_correctors = models.BooleanField(default = False)
 
     def __repr__(self):
         return self.word_list + ' ' + str(self.ncorrect)
