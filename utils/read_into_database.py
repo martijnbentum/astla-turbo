@@ -84,7 +84,7 @@ def to_word_instance(session,index,word, gt_aligned_word,
     d ={}
     d['word'] = word
     d['index'] = index 
-    d['audio_url'] = session.audio_url
+    d['audio_url'] = session.identifier
     d['audio_filename'] = session.audio_filename
     d['correct'] = int(cl[index])
     d['gt_aligned_word']= gt_aligned_word
@@ -102,7 +102,7 @@ def to_word_instance(session,index,word, gt_aligned_word,
 
 
 def load_zwijsen_session(audio_filename):
-    o = audio_filename_to_session_info(audio_filename):
+    o = audio_filename_to_session_info(audio_filename)
     identifier, audio, info_dict, prompt, word_list = o
     wl = word_list
     d = {}
