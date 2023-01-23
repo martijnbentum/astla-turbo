@@ -2,6 +2,16 @@ import glob
 import os
 from . import handle_dart_excel 
 
+# mp3 files downloaded her
+# /vol/tensusers5/mbentum/dart_mp3
+
+# converted to wav and stored here
+# /vol/tensusers5/mbentum/dart_wav
+
+#wav2vec transcriptions stored here
+# /vol/tensusers5/mbentum/dart_transcriptions
+
+
 
 def collect_audio(urls = None, goal_dir = '../dart_mp3/'):
     if not urls: urls = handle_dart_excel.audio_urls()
