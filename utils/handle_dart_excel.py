@@ -1,4 +1,5 @@
 from openpyxl import load_workbook
+from utils import session_helper
 
 def open_dart_excel():
     wb = load_workbook('../DART_test_data.xlsx')
@@ -109,4 +110,62 @@ def data_line_to_list_set_page(data_line):
     set_number = data_line[4]
     page_number = data_line[16]
     return list_number, set_number, page_number
+
+def group_info_on_teacher_list_set(info):
+    if type(info) == str: info = eval(info)
+    d = {}
+    for line in info:
+        k = line[0],line[1],line[4]
+        if k not in d.keys(): d[k] = []
+        d[k].append(line)
+    keys = list(d.keys())
+    for k in keys:
+        key = 'words_'+'_'.join(map(str,k))
+        d[key] = []
+        for line in d[k]:
+            d[key].append(line[2])
+        print(key)
+        print(len(d[key]), ' '.join(d[key]))
+    return d
+
+def check_group_info_dict(d):
+    wordlist_keys = [k for k in d.keys() if 'word' in k]
+    number_keys = [k for k in d.keys() if not 'word' in k]
+    words_identical = True 
+    wordlist = d[wordlist_keys[0]]
+    for wordlist_key in wordlist_keys:
+        if wordlist != d[wordlist_key]: words_identical = False
+    teacher_ids = [k[0] for k in number_keys]
+    teachers_differ = len(teacher_ids) == len(set(teacher_ids))
+    return words_identical, teachers_differ
+
+def fix_multiple_dart_annotators(session):
+    d = group_info_on_teacher_list_set(session.info)
+    wi, td =  check_group_info_dict(d)
+    if not wi: raise ValueError('words are not identical',session)
+    wordlist_keys = [k for k in d.keys() if 'word' in k]
+    number_keys = [k for k in d.keys() if not 'word' in k]
+    session_list = d[number_keys[0]]
+    word_list = d[wordlist_keys[0]]
+    if len(wordlist_keys) == 1: raise ValueError('only 1 wl',session)
+    if len(session_list) != len(word_list): 
+        raise ValueError('wl and sl not of equal length',session)
+    cl = session_list_to_correct_list(session_list)
+    
+    session.multiple_dart_correctors = True
+    session.word_list = ','.join(word_list)
+    session.nwords = len(word_list)
+    session.ncorrect = cl.count(1)
+    session.all_correct = cl.count(1) == len(cl)
+    session.all_incorrect = cl.count(0) == len(cl)
+    session.correct_list = ','.join(map(str,cl))
+    session.align = '\n'.join(session_helper.align(session))
+
+    session.save()
+    session_helper.to_word_instances(session)
+
+
+    
+    
+        
 
