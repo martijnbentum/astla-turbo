@@ -14,6 +14,13 @@ class Pupil(models.Model):
     def __repr__(self):
         return 'pupil: ' + str(self.identifier)
 
+    @property
+    def duration_sessions(self):
+        if not hasattr(self,'_duration_sessions'):
+            n = sum([x.duration for x in self.session_set.all()])
+            self._duration_sessions = n
+        return self._duration_sessions
+
 class Teacher(models.Model):
     identifier = models.CharField(max_length= 30, unique=True)
 
