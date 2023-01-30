@@ -1,4 +1,5 @@
 from django.db import models
+from utils import helper
 
 # Create your models here.
 
@@ -10,7 +11,19 @@ class School(models.Model):
 
 class Pupil(models.Model):
     identifier = models.CharField(max_length= 30, unique=True)
-
+    pupil_id = models.CharField(max_length= 30, default = '')
+    class_id = models.CharField(max_length= 30, default = '')
+    school_id = models.CharField(max_length= 30, default = '')
+    birth_date = models.DateField(default = None, blank= True, null=True)
+    home_lang_str = models.CharField(max_length= 50, default = '')
+    gender = models.CharField(max_length= 10, default = '' )
+    reading_level = models.CharField(max_length= 10, default = '')
+    train_dev_test = models.CharField(max_length=5,default='')
+    only_dutch = models.BooleanField(null=True)
+    also_dutch = models.BooleanField(null=True)
+    no_dutch = models.BooleanField(null=True)
+    info= models.TextField(default = '')
+    
     def __repr__(self):
         return 'pupil: ' + str(self.identifier)
 
@@ -20,6 +33,12 @@ class Pupil(models.Model):
             n = sum([x.duration for x in self.session_set.all()])
             self._duration_sessions = n
         return self._duration_sessions
+
+    @property
+    def current_age_in_months(self):
+        return helper.delta_months(self.birth_date)
+
+
 
 class Teacher(models.Model):
     identifier = models.CharField(max_length= 30, unique=True)
@@ -53,6 +72,8 @@ class Session(models.Model):
     align = models.TextField(default='')
     dataset = models.CharField(max_length=50,default='')
     multiple_dart_correctors = models.BooleanField(default = False)
+    train_dev_test = models.CharField(max_length=5,default='')
+    
 
     def __repr__(self):
         return self.word_list + ' ' + str(self.ncorrect)
@@ -71,6 +92,8 @@ class Word(models.Model):
     span = models.CharField(max_length= 100, default = '') 
     levenshtein_distance= models.IntegerField(default=0)
     levenshtein_ratio = models.FloatField(default = 0.0)
+    dataset = models.CharField(max_length=50,default='')
+    train_dev_test = models.CharField(max_length=5,default='')
 
 
     class Meta:
