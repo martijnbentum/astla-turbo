@@ -2,6 +2,8 @@ from texts.models import School, Pupil, Session, Word
 import random
 import time
 
+from . import descriptive_stats
+
 
 def _compute_number_of_items_per_set(train,dev,test,nsamples):
     assert train + dev + test - 1 < 0.0001
@@ -45,18 +47,66 @@ def split_on_sessions(train=.4,dev=.1,test=.5,sessions = None):
     if sessions == None:sessions = Session.objects.all()
     return split_data(train,dev,test,sessions)
 
-def split_on_pupils(train=.4,dev=.1,test=.5,pupils = None):
+def split_on_pupils(train=.4,dev=.1,test=.5,pupils = None, save = False):
     if pupils == None:pupils= Pupil.objects.all()
     ptrain,pdev,ptest = split_data(train,dev,test,pupils)
     train, dev, test = [], [], []
     for p in ptrain:
-        train.extend( list(p.session_set.all()) ) 
+        train.extend( list(p.session_set.exclude(all_incorrect = True)) ) 
+    descriptive_stats.describe_session_set(train,'train')
+    descriptive_stats.describe_pupil_set(ptrain,'train')
+    print('-'*80)
     for p in pdev:
-        dev.extend( list(p.session_set.all()) ) 
+        dev.extend( list(p.session_set.exclude(all_incorrect=True)) ) 
+    descriptive_stats.describe_session_set(dev,'dev')
+    descriptive_stats.describe_pupil_set(pdev,'dev')
+    print('-'*80)
     for p in ptest:
-        test.extend( list(p.session_set.all()) ) 
-    return train, dev, test
+        test.extend( list(p.session_set.exclude(all_incorrect=True)) ) 
+    descriptive_stats.describe_session_set(test,'test')
+    descriptive_stats.describe_pupil_set(ptest,'test')
+    d = {'sessions':{'train':train,'dev':dev,'test':test},
+        'pupils':{'train':ptrain, 'dev':pdev,'test':ptest}}
+    if save: save_split(d)
+    return d
+    
+def save_split(split_dict):
+    o = []
+    print('saving split on sessions')
+    for split in split_dict['sessions'].keys():
+        for session in split_dict['sessions'][split]:
+            session.train_dev_test = split
+            session.save()
+            o.append(str(session.pk) + '\t' + split)
+    print('saving split on pupils')
+    for split in split_dict['pupils'].keys():
+        for pupil in split_dict['pupils'][split]:
+            pupil.train_dev_test = split
+            pupil.save()
+    print('saving split on words')
+    _save_split_on_words()
+    print('saving split in text file')
+    with open('../train_dev_test_split_dart.txt','w') as fout:
+        fout.write('\n'.join(o))
 
+
+def _save_split_on_words():
+    words = Word.objects.filter(dataset = 'dart')
+    for word in words:
+        word.train_dev_test = word.session.train_dev_test
+        word.save()
+
+
+def get_train_dev_test_words():
+    train, dev, test = [], [], []
+    words = Word.objects.filter(dataset = 'dart')
+    for w in words:
+        if w.train_dev_test == '':continue
+        if w.train_dev_test == 'train':train.append(w)
+        if w.train_dev_test == 'dev':dev.append(w)
+        if w.train_dev_test == 'test':test.append(w)
+    return train,dev,test
+    
 
         
     
