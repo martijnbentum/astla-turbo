@@ -1,5 +1,6 @@
 from openpyxl import load_workbook
 from utils import session_helper
+from texts.models import Pupil
 
 def open_dart_excel():
     wb = load_workbook('../DART_test_data.xlsx')
@@ -165,6 +166,95 @@ def fix_multiple_dart_annotators(session):
     session_helper.to_word_instances(session)
 
 
+    
+def open_pupil_metadata(f = '../metadata_experiment2_anoniem.xlsx'):
+    '''load the pupil meta data from the excel file.'''
+    wb = load_workbook(f)
+    ws = wb['Blad2']
+    lines = list(ws.values)
+    header = lines[0]
+    data = lines[1:]
+    return wb, header, data
+
+def make_pupil_id(line):
+    '''create the pupil id from the pupil metadata file.'''
+    school_id = str(line[2])
+    class_id = str(line[3])
+    pupil_id = str(line[4])
+    pupil_id = school_id + class_id + pupil_id
+    pupil_id = pupil_id.lstrip('0')
+    assert pupil_id == str(line[0])
+    return pupil_id
+    
+def get_database_pupil(line, verbose = False):
+    '''retrieve a pupil from database based on the identifier'''
+    pupil_id = make_pupil_id(line)
+    try:pupil = Pupil.objects.get(identifier = pupil_id)
+    except:
+        if verbose: print('could not find',pupil_id, 'skipping')
+        return False
+    return pupil
+
+def update_pupil_information(line, save = False):
+    '''update pupil information based on the meta data in a line from
+    the excel metadata file
+    '''
+    dg = {'jongen':'male','meisje':'female',None:''}
+    dll = {'Zon':'zon','Maan':'maan','Ster':'ster',
+        'eigen leerlijn': 'eigen leerlijn','onbekend':'onbekend',
+        None:'onbekend'}
+    p = get_database_pupil(line)
+    if not p: return None 
+    p.school_id = str(line[2])
+    p.class_id = str(line[3])
+    p.pupil_id = str(line[4])
+    p.birth_date = line[10]
+    p.home_lang_str = str(line[13])
+    p.gender = dg[line[11]]
+    p.reading_level = dll[line[8]]
+    p.only_dutch = only_dutch(line)
+    p.also_dutch = also_dutch(line)
+    p.no_dutch = no_dutch(line)
+    p.info = str(line)
+    if save: p.save()
+    return p
+
+def only_dutch(line):
+    if line[13] == None: return None
+    l = str(line[13]).lower().strip()
+    if l == 'nl': return True
+    if l == 'n': return True
+    if l == 'nederlands': return True
+    if l == 'ned': return True
+    return False
+
+def also_dutch(line):
+    if line[13] == None: return None
+    if only_dutch(line): return False
+    l = str(line[13]).lower().strip()
+    if 'nederlands' in l: return True
+    if 'nederlans' in l: return True
+    if 'ned ' in l: return True
+    return False
+
+def no_dutch(line):
+    if line[13] == None: return None
+    if not only_dutch(line) and not also_dutch(line): return True
+    return False
+
+
+def update_all_pupil_information(save = False):
+    '''updates pupil information based on pupil meta data'''
+    _, header, data = open_pupil_metadata()
+    n = 0
+    for line in data:
+        pupil = update_pupil_information(line, save)
+        if pupil: n += 1
+    print('updated:',n,'pupils')
+
+
+
+    
     
     
         
