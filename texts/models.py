@@ -1,5 +1,7 @@
 from django.db import models
 from utils import helper
+import json
+import os
 
 # Create your models here.
 
@@ -70,14 +72,23 @@ class Session(models.Model):
     ncorrect = models.IntegerField(default = 0)
     nwords= models.IntegerField(default=0)
     align = models.TextField(default='')
+    whisper_align = models.TextField(default='')
     dataset = models.CharField(max_length=50,default='')
     multiple_dart_correctors = models.BooleanField(default = False)
     train_dev_test = models.CharField(max_length=5,default='')
+    word_time_information_available= models.BooleanField(null=True)
     
 
     def __repr__(self):
         return self.word_list + ' ' + str(self.ncorrect)
 
+    def whisper_json(self):
+        f = '../WHISPER_DART/dart-whisper-prompts/'
+        f += self.identifier.split('/')[-1].split('.')[0]
+        f += '.json'
+        if os.path.isfile(f):
+            return json.load(open(f))
+        print('could not find',f)
 
 class Word(models.Model):
     dargs = {'on_delete':models.SET_NULL,'blank':True,'null':True}
@@ -94,6 +105,10 @@ class Word(models.Model):
     levenshtein_ratio = models.FloatField(default = 0.0)
     dataset = models.CharField(max_length=50,default='')
     train_dev_test = models.CharField(max_length=5,default='')
+    start_time= models.FloatField(default = 0.0)
+    end_time= models.FloatField(default = 0.0)
+    duration = models.FloatField(default = 0.0)
+    word_time_information_available= models.BooleanField(null=True)
 
 
     class Meta:
