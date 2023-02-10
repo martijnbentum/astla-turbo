@@ -1,6 +1,8 @@
 import os
 from . import needleman_wunch
 from . import read_into_database
+    
+   
 
 def ground_truth(session):
     return session.word_list.replace(',', ' ').lower()
@@ -15,9 +17,24 @@ def transcription_txt(session, directory = '../dart_transcriptions/'):
     else:
         print('could not find transcription', filename)
 
+def transcription_table(session, directory = '../dart_transcriptions/'):
+    filename = directory + session.audio_filename.replace('.mp3','.table')
+    if os.path.isfile(filename):
+        return open(filename).read()
+    else:
+        print('could not find transcription', filename)
+
+def transcription_label_table(session,
+    directory='../dart_label_timestamps/'):
+    filename = directory + session.audio_filename.replace('.mp3','.table')
+    if os.path.isfile(filename):
+        return open(filename).read()
+    else:
+        print('could not find transcription', filename)
+
 def align(session):
     gt = ground_truth(session)
-    hyp = transcription_txt(session)
+    hyp = transcription_txt(session).replace('[UNK]','[')
     gt , hyp= needleman_wunch.nw(gt,hyp).split('\n')
     print('gt:  ' + gt)
     print('hyp: ' + hyp)
@@ -40,8 +57,8 @@ def to_word_instances(session):
             gt_aligned_word,hyp_aligned_word, char_start_end_indices)
     return words, gt_aligned_words,hyp_aligned_words
     
-    
-    
+
+
     
 def to_start_end_indices(indices,gt):
     indices.append(len(gt))
