@@ -110,6 +110,7 @@ class Word(models.Model):
     duration = models.FloatField(default = 0.0)
     word_time_information_available= models.BooleanField(null=True)
     whisper_info = models.TextField(default = '')
+    egemap_features = models.TextField(default = '')
 
 
     class Meta:
