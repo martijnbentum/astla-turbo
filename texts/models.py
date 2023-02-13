@@ -109,6 +109,7 @@ class Word(models.Model):
     end_time= models.FloatField(default = 0.0)
     duration = models.FloatField(default = 0.0)
     word_time_information_available= models.BooleanField(null=True)
+    whisper_info = models.TextField(default = '')
 
 
     class Meta:
