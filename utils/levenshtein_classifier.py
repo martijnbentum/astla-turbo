@@ -18,12 +18,6 @@ def make_levenshtein_dataset(levenshtein_type = 'wav2vec'):
     y_test= np.array([word.correct for word in test])
     return X_train, X_test, y_train, y_test
 
-def get_train_correct_incorrect_words():
-    train,dev,test = split_data.get_train_dev_test_words() 
-    train = train + dev
-    correct_words = [w for w in train if w.correct]
-    incorrect_words = [w for w in train if not w.correct]
-    return correct_words, incorrect_words
 
 def get_whisper_levenshtein_ratio(word):
     if not word.whisper_info: return 0
@@ -46,7 +40,8 @@ def compute_levenshtein_ratio_density_for_correct_incorrect_words(cw,icw,
 
 def plot_density_correct_incorrect_words(save = False, 
     levenshtein_type = 'wav2vec'):
-    correct_words, incorrect_words = get_train_correct_incorrect_words()
+    o = split_data.get_train_correct_incorrect_words()
+    correct_words, incorrect_words = o
     o = compute_levenshtein_ratio_density_for_correct_incorrect_words(
         correct_words, incorrect_words, levenshtein_type = levenshtein_type)
     density_correct, density_incorrect = o
@@ -84,7 +79,7 @@ class RatioClassifier:
         self.X_test = X_test
         self.y_train = y_train
         self.y_test = y_test
-        cw, icw = get_train_correct_incorrect_words()
+        cw, icw = split_data.get_train_correct_incorrect_words()
         self.correct_words = cw
         self.incorrect_words = icw
 
