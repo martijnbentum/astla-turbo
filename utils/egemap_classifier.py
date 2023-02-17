@@ -81,7 +81,7 @@ class EgemapFeaturesMLPClassifier:
 
     def train(self):
         self.clf= make_pipeline(StandardScaler(),MLPClassifier(
-        early_stopping = True, max_iter=400, hiddenlayer_sizes=(50,)))
+        early_stopping = True, max_iter=400, hidden_layer_sizes=(50,)))
         self.clf.fit(self.X_train,self.y_train)
 
     def predict(self,features):
