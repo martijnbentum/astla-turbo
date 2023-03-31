@@ -125,8 +125,8 @@ def group_info_on_teacher_list_set(info):
         d[key] = []
         for line in d[k]:
             d[key].append(line[2])
-        print(key)
-        print(len(d[key]), ' '.join(d[key]))
+        # print(key)
+        # print(len(d[key]), ' '.join(d[key]))
     return d
 
 def check_group_info_dict(d):
