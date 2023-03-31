@@ -47,9 +47,26 @@ def split_on_sessions(train=.4,dev=.1,test=.5,sessions = None):
     if sessions == None:sessions = Session.objects.all()
     return split_data(train,dev,test,sessions)
 
-def split_on_pupils(train=.4,dev=.1,test=.5,pupils = None, save = False):
+def _split_on_pupil_test_type(train_perc,dev_perc,test_perc,pupils):
+    d = make_test_type_pupil_dict(pupils)
+    ptrain, pdev, ptest = [], [], []
+    for k, v in d.items():
+        print(k,len(v))
+        train, dev, test = split_data(train_perc,dev_perc,test_perc,v)
+        ptrain.extend(train)
+        pdev.extend(dev)
+        ptest.extend(test)
+    return ptrain, pdev, ptest
+    
+    
+
+def split_on_pupils(train=.4,dev=.1,test=.5,pupils = None, save = False,
+    split_on_test_type = True):
     if pupils == None:pupils= Pupil.objects.all()
-    ptrain,pdev,ptest = split_data(train,dev,test,pupils)
+    if split_on_test_type: 
+        ptrain, pdev, ptest = _split_on_pupil_test_type(train,dev,test,pupils)
+    else:
+        ptrain,pdev,ptest = split_data(train,dev,test,pupils)
     train, dev, test = [], [], []
     for p in ptrain:
         train.extend( list(p.session_set.exclude(all_incorrect = True)) ) 
@@ -109,6 +126,15 @@ def get_train_dev_test_words():
     
 
         
+def make_test_type_pupil_dict(pupils = None):
+    if not pupils: pupils = Pupil.objects.all()
+    d = {}
+    for pupil in pupils:
+        k = ','.join(pupil.test_types)
+        if k not in d.keys(): d[k] = [pupil]
+        else: d[k].append(pupil)
+    return d
+    
     
     
     
