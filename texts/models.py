@@ -40,6 +40,13 @@ class Pupil(models.Model):
     def current_age_in_months(self):
         return helper.delta_months(self.birth_date)
 
+    @property
+    def test_types(self):
+        if not hasattr(self,'_test_types'):
+            t = list(set([x.test_type for x in self.session_set.all()]))
+            self._test_types = t
+        return self._test_types
+
 
 
 class Teacher(models.Model):
@@ -89,6 +96,32 @@ class Session(models.Model):
         if os.path.isfile(f):
             return json.load(open(f))
         print('could not find',f)
+
+    @property
+    def n_correctors(self):
+        if not self.multiple_dart_correctors: return 1
+        return len(self.teacher_to_correct_list_dict.keys())
+
+    @property
+    def teacher_to_correct_list_dict(self):
+        if not self.multiple_dart_correctors: 
+            d[self.teacher.identifier] = self.correct_list 
+        if hasattr(self,'_teacher_to_correct_list_dict'):
+            return self._teacher_to_correct_list_dict
+        from utils.handle_dart_excel import group_info_on_teacher_list_set
+        from utils.handle_dart_excel import session_list_to_correct_list
+        d = group_info_on_teacher_list_set(self.info)
+        number_keys = [k for k in d.keys() if not 'word' in k]
+        o = {}
+        for number_key in number_keys:
+            teacher_identifier = number_key[0]
+            session_list = d[number_key]
+            cl = session_list_to_correct_list(session_list)
+            o[teacher_identifier] = cl
+        self._teacher_to_correct_list_dict = o
+        return self._teacher_to_correct_list_dict
+
+    
 
 class Word(models.Model):
     dargs = {'on_delete':models.SET_NULL,'blank':True,'null':True}
