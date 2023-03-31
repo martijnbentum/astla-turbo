@@ -1,7 +1,6 @@
 if not __name__ == '__main__':
     from . import session_helper
-else: 
-    import unittest
+import unittest
 import Levenshtein
     
 
@@ -19,6 +18,7 @@ def _add_whisper_align_to_session(session):
 def extract_all_whisper_words(session):
     words = []
     o = session.whisper_json()
+    if not o:return False
     for segment in o['segments']:
         words.extend(segment['words'])
     return words
@@ -38,8 +38,11 @@ def whisper_words_to_string_indices(session):
     return t, word_start_end_indices
     
 
-def match_whisper_words_and_word_list(session):
+def match_whisper_words_and_word_list(session, save = False):
     whisper_words = extract_all_whisper_words(session)
+    if not whisper_words:
+        print('could not extract whisper words')
+        return
     t,i = whisper_words_to_string_indices(session)
     words = session_helper.to_words(session)
     gt, hyp = session.whisper_align.split('\n')
@@ -53,16 +56,28 @@ def match_whisper_words_and_word_list(session):
         gt_aligned_word = gt_aligned_words[index]
         hyp_aligned_word = hyp_aligned_words[index]
         char_start_end_indices = start_end_indices[index]
-        w_words =find_whisper_words(char_start_end_indices,hyp,i, word,
-            whisper_words)
-        w_word = prune_whisper_words(w_words, word)
-        w_word = add_levenshtein_ratio(w_word,word)
-        matches.append([session.word_set.get(index = index),w_word])
+        w_words,ww_indices =find_whisper_words(char_start_end_indices,hyp,i, 
+            word,whisper_words)
+        w_word, w_word_index = prune_whisper_words(w_words, word, ww_indices)
+        if not w_word:
+            print('could not find match',w_word)
+            continue
+        w_word = add_info(w_word,word, char_start_end_indices,
+            ww_indices, w_word_index)
+        db_word = session.word_set.get(index = index)
+        if save:
+            db_word.whisper_info = str(w_word)
+            db_word.save()
+        matches.append([db_word,w_word])
     return matches
 
-def add_levenshtein_ratio(w_word,wl_word):
+def add_info(w_word,wl_word, char_start_end_indices, 
+        whisper_word_indices, w_word_index):
     ratio= Levenshtein.ratio(wl_word, w_word['text'])
     w_word['levenshtein_ratio'] =ratio
+    w_word['char_start_end_indices'] = char_start_end_indices 
+    w_word['whisper_word_indices'] = whisper_word_indices
+    w_word['selected_whisper_word_index'] = w_word_index
     return w_word
 
     
@@ -111,19 +126,21 @@ def find_whisper_words(char_start_end_indices, hyp_text,
     if verbose: print(o)
     whisper_word_indices = [x[0] for x in o]
     w_words = [whisper_words[i] for i in whisper_word_indices]
-    return w_words
+    return w_words, whisper_word_indices
 
-def prune_whisper_words(w_words, wl_word):
+def prune_whisper_words(w_words, wl_word, whisper_word_indices):
     ratios = []
     smallest = 10**6
     selected = []
-    for w_word in w_words:
+    selected_index = []
+    for index, w_word in zip(whisper_word_indices, w_words):
         w = w_word['text']
         distance = Levenshtein.distance(wl_word, w)
         if distance < smallest: 
             selected = w_word
+            selected_index = index
             smallest = distance
-    return selected
+    return selected, selected_index
         
             
     

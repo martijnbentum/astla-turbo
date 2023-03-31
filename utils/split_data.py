@@ -5,6 +5,13 @@ import time
 from . import descriptive_stats
 
 
+def get_train_correct_incorrect_words():
+    train,dev,test = get_train_dev_test_words() 
+    train = train + dev
+    correct_words = [w for w in train if w.correct]
+    incorrect_words = [w for w in train if not w.correct]
+    return correct_words, incorrect_words
+
 def _compute_number_of_items_per_set(train,dev,test,nsamples):
     assert train + dev + test - 1 < 0.0001
     ntrain = int(nsamples * train)
