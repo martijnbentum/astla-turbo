@@ -1,5 +1,8 @@
 from texts.models import School, Pupil, Session, Word
+import glob
+import os
 import random
+import shutil
 import time
 
 from . import descriptive_stats
@@ -141,6 +144,95 @@ def make_test_type_pupil_dict(pupils = None):
         if k not in d.keys(): d[k] = [pupil]
         else: d[k].append(pupil)
     return d
+
+
+def _add_exclude(sessions,d):
+    '''add sessions to exclude list to ensure they are not selected again'''
+    f = '../exclude_list_sessions_sa.txt'
+    o = []
+    for s in sessions:
+        o.append( str(s.pk) + '\t' + d + '\t' + s.audio_filename)
+    with open(f,'a') as fout:
+        fout.write('\n'.join(o)+'\n')
+
+def _overwrite_exclude(d):
+    '''if a folder is overwritten also overwrite the exclude files'''
+    f = '../exclude_list_sessions_sa.txt'
+    audio_filenames = glob.glob(d+'*.mp3')
+    with open(f,'r') as fin:
+        t = fin.read().split('\n')
+    o = []
+    for line in t:
+        if not line:continue
+        found = False
+        for af in audio_filenames:
+            af = af.split('/')[-1]
+            if af in line: found = True
+        print(line,found)
+        if not found: o.append(line)
+    if not o: o = ''
+    else: o = '\n'.join(o) +'\n'
+    with open(f,'w') as fout:
+        fout.write(o)
+        
+def _generate_textgrids(d):
+    '''create textgrids for all mp3 files for directory d'''
+    ad = os.path.abspath(d) + '/'
+    cmd = '/usr/bin/praat --run ../audio2textgrid.psc '
+    cmd += ad + ' .mp3 ' + ad
+    print('create praat scripts')
+    print(cmd)
+    os.system(cmd)
+    os.system('cp ../edit_textgrid.psc ' + d)
+
+def _make_wordlist(sessions,d):
+    '''create a word list for all sessions and save it in directory d'''
+    o = ['File;Words']
+    for s in sessions:
+        wl = s.word_list
+        f = s.audio_filename
+        o.append(f.split('.')[0] + ';' + wl)
+    with open(d + 'word_list','w') as fout:
+        fout.write('\n'.join(o))
+    
+def _get_exclude():
+    '''get the database ids for all excluded sessions.'''
+    f = '../exclude_list_sessions_sa.txt'
+    if not os.path.isfile(f): return []
+    with open(f) as fin:
+        t = [line for line in fin.read().split('\n') if line]
+    return [int(line.split('\t')[0]) for line in t]
+
+def select_files_sa(n_files, sa_name, version = 1, overwrite = False):
+    '''select a random set of sessions from the training set to be transcribed.'''
+    if overwrite:
+        print('should you really be overwriting?''')
+        return
+    if sa_name not in ['janneke','stephanie','martijn']: 
+        raise ValueError('unknown sa',sa_name)
+    exclude = _get_exclude()
+    sessions = Session.objects.filter(train_dev_test = 'train')
+    sessions = sessions.exclude(pk__in = exclude)
+    sessions = random.sample(list(sessions), n_files)
+    directory= '../' + sa_name + '_v' + str(version) + '/'
+    dart_mp3 = '../dart_mp3/'
+    if os.path.isdir(directory) and overwrite:
+        _overwrite_exclude(directory)
+        shutil.rmtree(directory)
+    if not os.path.isdir(directory):
+        os.mkdir(directory)
+    else: 
+        print('directory',directory,'already exists',
+            ' use overwrite=true or other version != (',version,')' )
+        return
+    for s in sessions:
+        os.system('cp ' + dart_mp3 + s.audio_filename +' ' + directory)
+    _add_exclude(sessions,directory)
+    _make_wordlist(sessions,directory)
+    _generate_textgrids(directory)
+    
+    
+    
     
     
     
