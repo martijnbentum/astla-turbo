@@ -11,6 +11,35 @@ class School(models.Model):
     def __repr__(self):
         return 'school: ' + str(self.identifier)
 
+class Jasmin_child(models.Model):
+    identifier = models.CharField(max_length = 30, unique=True)
+    residence_place = models.CharField(max_length = 30)
+    birth_place = models.CharField(max_length = 30)
+    educational_place = models.CharField(max_length = 30)
+    dialect_region= models.CharField(max_length = 30)
+    gender = models.CharField(max_length=10)
+    age = models.IntegerField(null = True)
+    group = models.IntegerField(null = True)
+    home_language1 = models.CharField(max_length = 30)
+    home_language2 = models.CharField(max_length = 30, null=True)
+    info= models.TextField(default = '')
+
+class Jasmin_recording(models.Model):
+    dargs = {'on_delete':models.SET_NULL,'blank':True,'null':True}
+    identifier = models.CharField(max_length = 30, unique = True)
+    audio_filename = models.CharField(max_length = 300, default = '')
+    awd_filename = models.CharField(max_length = 300, default = '')
+    child = models.ForeignKey(Jasmin_child,**dargs)
+    component = models.CharField(max_length = 10, default = '')
+    reading_level = models.CharField(max_length = 15, default = '',null=True)
+    group = models.IntegerField(null = True)
+    nchannels = models.IntegerField(null = True)
+    sample_rate = models.IntegerField(null = True)
+    duration = models.FloatField(default=0.0)
+    info= models.TextField(default = '')
+    
+    
+
 class Pupil(models.Model):
     identifier = models.CharField(max_length= 30, unique=True)
     pupil_id = models.CharField(max_length= 30, default = '')
@@ -25,6 +54,7 @@ class Pupil(models.Model):
     also_dutch = models.BooleanField(null=True)
     no_dutch = models.BooleanField(null=True)
     info= models.TextField(default = '')
+    dataset = models.CharField(max_length=50,default='')
     
     def __repr__(self):
         return 'pupil: ' + str(self.identifier)
