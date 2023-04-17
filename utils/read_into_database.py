@@ -1,7 +1,58 @@
-from . import handle_dart_excel
+from . import handle_dart_excel, handle_jasmin_excel
 from django.db import IntegrityError
-from texts.models import Session, Pupil, Teacher, School, Word
+from texts.models import Session, Pupil, Teacher, School, Word, Jasmin_child
+from texts.models import Jasmin_recording
 import Levenshtein
+
+def load_jasmin():
+    '''loads children info and recording metadata into database.'''
+    children = load_all_jasmin_children()
+    recordings = load_all_jasmin_recordings()
+    return children, recordings
+
+def load_all_jasmin_recordings():
+    '''load all jasmin recording metadata into database.'''
+    _, recordings = handle_jasmin_excel.load_recording_info()
+    instances = []
+    for recording in recordings:
+        if recording[0] == None: break
+        instance = load_jasmin_recording(recording)
+        instances.append(instance)
+    return instances
+
+def load_jasmin_recording(data_line):
+    '''load single recording meta data into database.'''
+    d, child_id = handle_jasmin_excel.make_recording_dict(data_line)
+    try: d['child'] = Jasmin_child.objects.get(identifier = child_id)
+    except Jasmin_child.DoesNotExist: d['child'] = None
+    identifier = d['identifier']
+    try: instance = Jasmin_recording.objects.get(identifier = identifier)
+    except Jasmin_recording.DoesNotExist:
+        print('creating a jasmin recording', identifier)
+        instance = Jasmin_recording(**d)
+        instance.save()
+    return instance
+
+def load_all_jasmin_children():
+    '''load all child metadata into database.'''
+    _, children = handle_jasmin_excel.load_child_info()
+    instances = []
+    for child in children:
+        if child[0] == None: break
+        instance = load_jasmin_child(child)
+        instances.append(instance)
+    return instances
+
+def load_jasmin_child(data_line):
+    '''load metadata of single child of jasmin dataset into database.'''
+    d = handle_jasmin_excel.make_child_dict(data_line)
+    identifier = d['identifier']
+    try: instance = Jasmin_child.objects.get(identifier = identifier)
+    except Jasmin_child.DoesNotExist:
+        print('creating a jasmin child', identifier)
+        instance = Jasmin_child(**d)
+        instance.save()
+    return instance
 
 
 def load_all_simple(data = None):
