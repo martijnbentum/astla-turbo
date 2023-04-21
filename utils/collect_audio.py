@@ -1,6 +1,7 @@
 import glob
 import os
 from . import handle_dart_excel 
+from texts.models import Jasmin_recording
 
 # mp3 files downloaded her
 # /vol/tensusers5/mbentum/dart_mp3
@@ -26,4 +27,16 @@ def collect_audio(urls = None, goal_dir = '../dart_mp3/'):
     print('n mp3 files',n_mp3_after, 'currently in:', goal_dir)
 
 
+
+def collect_jasmin_audio():
+    jr = Jasmin_recording.objects.all()
+    goal_dir = '../jasmin_wav/'
+    for recording in jr:
+        f = recording.audio_filename
+        output_name = goal_dir + f.split('/')[-1]
+        if not os.path.isfile(output_name):
+            print('converting to mono and copying to',goal_dir)
+            os.system('sox ' + f + ' ' + output_name + ' channels 1')
+
+        
 
