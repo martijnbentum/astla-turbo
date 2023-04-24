@@ -52,6 +52,21 @@ class Jasmin_recording(models.Model):
             o.extend(phrases)
         return o
     
+class Jasmin_word(models.Model):
+    dargs = {'on_delete':models.SET_NULL,'blank':True,'null':True}
+    awd_word = models.CharField(max_length= 100, default = '')
+    awd_word_phoneme = models.CharField(max_length= 100, default = '')
+    awd_word_phonemes= models.TextField(default = '')
+    start_time = models.FloatField(default=None, null=True)
+    end_time = models.FloatField(default=None, null=True)
+    recording = models.ForeignKey(Jasmin_recording,**dargs)
+    child = models.ForeignKey(Jasmin_child,**dargs)
+    awd_word_tier_index = models.PositiveIntegerField(null=True,blank=True)
+    special_word= models.BooleanField(default=False)
+    eos= models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('recording','child','awd_word_tier_index')
     
 
 class Pupil(models.Model):
