@@ -1,5 +1,5 @@
 from django.db import models
-from utils import helper
+from utils import helper, jasmin_word
 import json
 import os
 import textgrids
@@ -32,12 +32,16 @@ class Jasmin_recording(models.Model):
     awd_filename = models.CharField(max_length = 300, default = '')
     child = models.ForeignKey(Jasmin_child,**dargs)
     component = models.CharField(max_length = 10, default = '')
-    reading_level = models.CharField(max_length = 15, default = '',null=True)
+    reading_level=models.CharField(max_length = 15, default = '',null=True)
     group = models.IntegerField(null = True)
     nchannels = models.IntegerField(null = True)
     sample_rate = models.IntegerField(null = True)
     duration = models.FloatField(default=0.0)
     info= models.TextField(default = '')
+
+    def __str__(self):
+        m = self.identifier + ' | ' + str(round(self.duration,2))
+        return m
 
     def load_awd(self):
         f = '../jasmin_awd/' + self.awd_filename.split('/')[-1]
@@ -45,13 +49,11 @@ class Jasmin_recording(models.Model):
 
     def phrases(self, end_on_eos = True, minimum_duration = None,
         maximum_duration = None):
-        d = self.speaker_to_phrases_dict(end_on_eos, minimum_duration,
-            maximum_duration)
-        o = []
-        for phrases in d.values():
-            o.extend(phrases)
-        return o
-    
+        words = self.jasmin_word_set.all()
+        return jasmin_word.words_to_phrases(words,end_on_eos, 
+            minimum_duration,maximum_duration)
+
+
 class Jasmin_word(models.Model):
     dargs = {'on_delete':models.SET_NULL,'blank':True,'null':True}
     awd_word = models.CharField(max_length= 100, default = '')
@@ -67,6 +69,15 @@ class Jasmin_word(models.Model):
 
     class Meta:
         unique_together = ('recording','child','awd_word_tier_index')
+
+    def __str__(self):
+        m = self.awd_word + ' | ' + self.awd_word_phoneme
+        m += ' | ' + str(round(self.duration,2))
+        return m
+
+    @property
+    def duration(self):
+        return self.end_time - self.start_time
     
 
 class Pupil(models.Model):
