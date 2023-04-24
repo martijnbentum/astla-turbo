@@ -53,6 +53,11 @@ class Jasmin_recording(models.Model):
         return jasmin_word.words_to_phrases(words,end_on_eos, 
             minimum_duration,maximum_duration)
 
+    def component(self):
+        if 'comp-p' in self.awd_filename: return 'p'
+        if 'comp-q' in self.awd_filename: return 'q'
+        raise ValueError('not comp-p or comp-q in', self.awd_filename)
+
 
 class Jasmin_word(models.Model):
     dargs = {'on_delete':models.SET_NULL,'blank':True,'null':True}
