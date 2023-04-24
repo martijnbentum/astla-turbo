@@ -6,11 +6,11 @@ from matplotlib import pyplot as plt
 import os
 import random
 from utils import needleman_wunch as nw
-from text.models import Textgrid
+from texts.models import Jasmin_recording
 
-
-cgn_wav2vec_dir = '/vol/tensusers3/mbentum/cgn_wav2vec/'
-cgn_align = '/vol/tensusers3/mbentum/cgn_wav2vec_align/'
+base_dir = '/vol/tensusers3/mbentum/astla/'
+jasmin_wav2vec_dir = base_dir + 'jasmin_wav2vec2_transcription/'
+jasmin_align = base_dir + 'jasmin_align/'
 
 def _select_10_perc_table_filenames():
     random.seed(9)
@@ -21,11 +21,11 @@ def _select_10_perc_table_filenames():
     
 
 def table_filenames():
-    fn = glob.glob(cgn_wav2vec_dir + '*.table')
+    fn = glob.glob(jasmin_wav2vec_dir + '*.table')
     return fn
 
 def text_filename():
-    fn = glob.glob(cgn_wav2vec_dir + '*.txt')
+    fn = glob.glob(jasmin_wav2vec_dir + '*.txt')
     return fn
 
 def load_table(filename):
@@ -42,26 +42,26 @@ def load_text(filename):
         t = fin.read()
     return t
 
-def table_filename_to_cgn_id(f):
-    cgn_id = f.split('/')[-1].split('.')[0]
-    return cgn_id
+def table_filename_to_jasmin_id(f):
+    jasmin_id = f.split('/')[-1].split('.')[0]
+    return jasmin_id
 
 def make_alignments(small_set = False, randomize = None):
     if not small_set: fn = table_filenames()
     else: fn = _select_10_perc_table_filenames()
     random.shuffle(fn)
     for f in fn:
-        cgn_id = table_filename_to_cgn_id(f)
+        jasmin_id = table_filename_to_jasmin_id(f)
         if randomize:
-            directory = cgn_align[:-1] + '_' + str(randomize) + '/'
+            directory = jasmin_align[:-1] + '_' + str(randomize) + '/'
         else: 
-            directory = cgn_align
-        align_filename = directory+ cgn_id
+            directory = jasmin_align
+        align_filename = directory+jasmin_id 
         if os.path.isfile(align_filename): 
-            print('skiping',cgn_id, small_set, randomize, len(fn))
+            print('skiping',jasmin_id, small_set, randomize, len(fn))
             continue
-        print('handling',cgn_id, small_set, randomize, len(fn))
-        Align(cgn_id, make_phrases = False, randomize = randomize)
+        print('handling',jasmin_id, small_set, randomize, len(fn))
+        Align(jasmin_id, make_phrases = False, randomize = randomize)
 
 def make_all_randomized_alignments():
     rv = [2,4,8,16,32,64]
@@ -96,10 +96,10 @@ def randomize_text(text, random_perc):
 class Align:
     '''align object to align cgn textgrid and wav2vec transcript.
     '''
-    def __init__(self,cgn_id, make_phrases = True, randomize = None):
-        self.cgn_id = cgn_id
+    def __init__(self,jasmin_id, make_phrases = True, randomize = None):
+        self.cgn_id = jasmin_id
         self.randomize = randomize
-        self.textgrid = Textgrid.objects.get(cgn_id = cgn_id)
+        self.textgrid = Jasmin_recording.objects.get(identifier = jasmin_id)
         self.awd_words = list(self.textgrid.word_set.all())
         # self.awd_text = ' '.join([w.awd_word for w in self.awd_words])
         self.awd_text = phrases_to_text(self.textgrid.phrases())
@@ -116,11 +116,11 @@ class Align:
 
     def _set_align(self):
         if self.randomize: 
-            directory = cgn_align[:-1] + '_' + str(self.randomize) + '/'
+            directory = jasmin_align[:-1] + '_' + str(self.randomize) + '/'
             if not os.path.isdir(directory): os.mkdir(directory)
             cgn_text = randomize_text(self.awd_text.lower(), self.randomize)
         else:
-            directory = cgn_align
+            directory = jasmin_align
             cgn_text = self.awd_text
         self.align_filename = directory + self.cgn_id
         print(self.align_filename)
@@ -601,7 +601,7 @@ def load_phrase_dataset(randomized = False):
     return load_dataset('../phrase_ds.json'), header
     
 def make_word_dataset(save = False):
-    cgn_ids = [f.split('/')[-1] for f in glob.glob(cgn_align +'fn*')]
+    cgn_ids = [f.split('/')[-1] for f in glob.glob(jasmin_align +'fn*')]
     word_ds = []
     for i,cgn_id in enumerate(cgn_ids):
         print(cgn_id,i,len(cgn_ids))
@@ -613,7 +613,7 @@ def make_word_dataset(save = False):
     
 
 def make_datasets(save = False):
-    cgn_ids = [f.split('/')[-1] for f in glob.glob(cgn_align +'fn*')]
+    cgn_ids = [f.split('/')[-1] for f in glob.glob(jasmin_align +'fn*')]
     phrase_ds = []
     align_ds = []
     for i,cgn_id in enumerate(cgn_ids):
@@ -627,7 +627,7 @@ def make_datasets(save = False):
     return phrase_ds, align_ds
 
 def make_randomized_text_datasets(save = False):
-    directory = cgn_align[:-1] + '_2/'
+    directory = jasmin_align[:-1] + '_2/'
     cgn_ids = [f.split('/')[-1] for f in glob.glob(directory +'fn*')]
     phrase_ds = []
     align_ds = []
@@ -813,7 +813,7 @@ def _handle_error_align(cgn_id,n):
     else:print(cgn_id,n,'ok')
     
 def handle_all_error_align(n = []):
-    directory = cgn_align[:-1] + '_2/'
+    directory = jasmin_align[:-1] + '_2/'
     cgn_ids = [f.split('/')[-1] for f in glob.glob(directory +'fn*')]
     random.shuffle(cgn_ids)
     phrase_ds = []
