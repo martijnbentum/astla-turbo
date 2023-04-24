@@ -2,6 +2,7 @@ from django.db import models
 from utils import helper
 import json
 import os
+import textgrids
 
 # Create your models here.
 
@@ -37,6 +38,19 @@ class Jasmin_recording(models.Model):
     sample_rate = models.IntegerField(null = True)
     duration = models.FloatField(default=0.0)
     info= models.TextField(default = '')
+
+    def load_awd(self):
+        f = '../jasmin_awd/' + self.awd_filename.split('/')[-1]
+        return textgrids.TextGrid(f)
+
+    def phrases(self, end_on_eos = True, minimum_duration = None,
+        maximum_duration = None):
+        d = self.speaker_to_phrases_dict(end_on_eos, minimum_duration,
+            maximum_duration)
+        o = []
+        for phrases in d.values():
+            o.extend(phrases)
+        return o
     
     
 
