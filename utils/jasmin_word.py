@@ -2,7 +2,8 @@ def speaker_textgrid_to_words(jasmin_recording):
     from texts.models import Jasmin_word
     t = jasmin_recording.load_awd()
     child = jasmin_recording.child
-    intervals = t[child.identifier]
+    identifier = child_identifier(child, t)
+    intervals = t[identifier]
     words = []
     for i, interval in enumerate(intervals):
         text = interval.text.strip('.?!')
@@ -14,8 +15,8 @@ def speaker_textgrid_to_words(jasmin_recording):
         except Jasmin_word.DoesNotExist: pass
         d = {}
         d['awd_word'] = text
-        d['awd_word_phoneme'] = t[child.identifier +'_FON'][i].text
-        d['awd_word_phonemes'] = str(get_phonemes(t,child,interval))
+        d['awd_word_phoneme'] = t[identifier +'_FON'][i].text
+        d['awd_word_phonemes'] = str(get_phonemes(t,identifier,interval))
         d['special_word'] = '*' in text
         d['eos'] = '.' in text or '?' in text
         d['awd_word_tier_index'] = i
@@ -28,10 +29,16 @@ def speaker_textgrid_to_words(jasmin_recording):
         words.append(w)
     return words
 
+def child_identifier(child, textgrid):
+    if child: return child.identifier
+    for key in textgrid.keys():
+        if '_' not in key: return key
+    raise ValueError(textgrid.keys(),'expected identifier in list without _')
+    
 
-def get_phonemes(t,child,interval):
+def get_phonemes(t,identifier,interval):
     s1, e1 = interval.xmin, interval.xmax
-    segment_intervals = t[child.identifier + '_SEG']
+    segment_intervals = t[identifier + '_SEG']
     overlapping_intervals = []
     for phoneme in segment_intervals:
         if phoneme.text == '': continue
