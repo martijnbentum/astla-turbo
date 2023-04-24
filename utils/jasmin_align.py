@@ -1,4 +1,4 @@
-# part of the ASTA project to align wav2vec and cgn with nw
+# part of the ASTA project to align wav2vec and jasmin with nw
 
 import glob
 import json
@@ -46,12 +46,18 @@ def table_filename_to_jasmin_id(f):
     jasmin_id = f.split('/')[-1].split('.')[0]
     return jasmin_id
 
-def make_alignments(small_set = False, randomize = None):
+def make_alignments(small_set = False, randomize = None, component = None):
+    from texts.models import Jasmin_recording
     if not small_set: fn = table_filenames()
     else: fn = _select_10_perc_table_filenames()
     random.shuffle(fn)
     for f in fn:
         jasmin_id = table_filename_to_jasmin_id(f)
+        if component:
+            jr = Jasmin_recording.objects.get(identifier=jasmin_id)
+            if jr.component() != component: 
+                print('skipping',jr.awd_filename)
+                continue
         if randomize:
             directory = jasmin_align[:-1] + '_' + str(randomize) + '/'
         else: 
@@ -94,22 +100,23 @@ def randomize_text(text, random_perc):
 
     
 class Align:
-    '''align object to align cgn textgrid and wav2vec transcript.
+    '''align object to align jasmin recoring and wav2vec transcript.
     '''
     def __init__(self,jasmin_id, make_phrases = True, randomize = None):
-        self.cgn_id = jasmin_id
+        self.jasmin_id = jasmin_id
         self.randomize = randomize
-        self.textgrid = Jasmin_recording.objects.get(identifier = jasmin_id)
-        self.awd_words = list(self.textgrid.word_set.all())
+        self.recording= Jasmin_recording.objects.get(identifier = jasmin_id)
+        self.awd_words = list(self.recording.jasmin_word_set.all())
         # self.awd_text = ' '.join([w.awd_word for w in self.awd_words])
-        self.awd_text = phrases_to_text(self.textgrid.phrases())
+        self.awd_text = phrases_to_text(self.recording.phrases())
         self._set_wav2vec_table_and_text()
         self._set_align()
         if make_phrases:
             self._set_phrases()
 
     def _set_wav2vec_table_and_text(self):
-        self.wav2vec_base_filename = cgn_wav2vec_dir + self.textgrid.cgn_id
+        temp =jasmin_wav2vec_dir+self.recording.identifier
+        self.wav2vec_base_filename=temp
         table = load_table(self.wav2vec_base_filename+'.table')
         self.wav2vec_table = fix_unk_in_table(table)
         self.wav2vec_text = load_text(self.wav2vec_base_filename+'.txt')
@@ -118,11 +125,12 @@ class Align:
         if self.randomize: 
             directory = jasmin_align[:-1] + '_' + str(self.randomize) + '/'
             if not os.path.isdir(directory): os.mkdir(directory)
-            cgn_text = randomize_text(self.awd_text.lower(), self.randomize)
+            temp = randomize_text(self.awd_text.lower(), self.randomize)
+            jasmin_text = temp
         else:
             directory = jasmin_align
-            cgn_text = self.awd_text
-        self.align_filename = directory + self.cgn_id
+            jasmin_text = self.awd_text
+        self.align_filename = directory + self.jasmin_id
         print(self.align_filename)
         if os.path.isfile(self.align_filename): 
             with open(self.align_filename) as fin:
@@ -130,19 +138,19 @@ class Align:
             if self.randomize:
                 self.awd_text = self.align.split('\n')[0].replace('-','')
         else:
-            self.align = nw.nw(cgn_text, self.wav2vec_text)
+            self.align = nw.nw(jasmin_text, self.wav2vec_text)
             with open(self.align_filename, 'w') as fout:
                 fout.write(self.align)
         
     def _set_phrases(self):
-        phrases = sort_phrases(self.textgrid.phrases())
+        phrases = sort_phrases(self.recording.phrases())
         self.words = []
         if self.randomize:
             o = align_phrases_with_randomized_aligned_text(phrases,
-                self.awd_text, self.aligned_cgn_text)
+                self.awd_text, self.aligned_jasmin_text)
         else:
             o = align_phrases_with_aligned_text(phrases,
-                self.aligned_cgn_text)
+                self.aligned_jasmin_text)
         self.phrases = []
         for phrase, start_index, end_index in o:
             p = Phrase(phrase,self,start_index, end_index)
@@ -162,22 +170,22 @@ class Align:
 
     @property
     def duration(self):
-        return self.textgrid.audio.duration
+        return self.recording.duration
 
     @property
     def component(self):
-        return self.textgrid.component.name
+        return 'jasmin'
 
     @property
     def nspeakers(self):
-        return self.textgrid.nspeakers
+        return 1
 
     @property
     def aligned_wav2vec_text(self):
         return self.align.split('\n')[1]
         
     @property
-    def aligned_cgn_text(self):
+    def aligned_jasmin_text(self):
         return self.align.split('\n')[0]
 
     @property
@@ -221,9 +229,9 @@ class Phrase:
         return m
 
     def __str__(self):
-        m = self.aligned_cgn_text + '\n'
+        m = self.aligned_jasmin_text + '\n'
         m += self.aligned_wav2vec_text + '\n'
-        m += 'cgn ts:'.ljust(12) + str(round(self.start_time,2)) + ' '
+        m += 'jasmin ts:'.ljust(12) + str(round(self.start_time,2)) + ' '
         m += str(round(self.end_time,2)) + '\n' 
         m += 'w2v ts:'.ljust(12) + str(self.wav2vec_start_time) + ' '
         m += str(self.wav2vec_end_time) +'\n' 
@@ -236,11 +244,11 @@ class Phrase:
         if self.start_index == self.end_index == None: return
         align = self.align
         start, end = self.start_index, self.end_index
-        cgn = align.aligned_cgn_text[start:end]
+        jasmin = align.aligned_jasmin_text[start:end]
         wav2vec= align.aligned_wav2vec_text[start:end]
         graphemes = align.wav2vec_aligned_graphemes_timestamps[start:end]
-        self.aligned_cgn_text= cgn
-        self.cgn_text = cgn.replace('-','').strip()
+        self.aligned_jasmin_text= jasmin
+        self.jasmin_text = jasmin.replace('-','').strip()
         self.aligned_wav2vec_text= wav2vec
         self.wav2vec_text = wav2vec.replace('-','')
         self.wav2vec_aligned_graphemes = graphemes
@@ -274,9 +282,10 @@ class Phrase:
         if self.start_index == self.end_index == None: return 'bad'
         if not self.wav2vec_start_time and not self.wav2vec_end_time:
             return 'bad'
-        self.text_ok = self.cgn_text == self.text
+        self.text_ok = self.jasmin_text == self.text
         d = delta
-        self.start_ok=equal_with_delta(self.start_time,self.wav2vec_start_time,d)
+        self.start_ok=equal_with_delta(self.start_time,
+            self.wav2vec_start_time,d)
         self.end_ok = equal_with_delta( self.end_time, self.wav2vec_end_time, d)
         if self.start_ok and self.end_ok: return 'good'
         if self.start_ok:  return 'start match'
@@ -287,11 +296,11 @@ class Phrase:
     @property
     def match_perc(self):
         match = 0
-        nchar = len(self.aligned_cgn_text)
+        nchar = len(self.aligned_jasmin_text)
         if nchar == 0: return 0
-        texts = zip(self.aligned_cgn_text,self.aligned_wav2vec_text)
-        for cgn_char,w2v_char in texts:
-            if cgn_char == w2v_char: match += 1
+        texts = zip(self.aligned_jasmin_text,self.aligned_wav2vec_text)
+        for jasmin_char,w2v_char in texts:
+            if jasmin_char == w2v_char: match += 1
         return round(match / nchar * 100,2)
 
     @property
@@ -324,10 +333,10 @@ class Word:
     def _set_info(self):
         if self.start_index == self.end_index == None: return
         start, end = self.start_index, self.end_index
-        cgn = self.phrase.aligned_cgn_text[start:end]
+        jasmin = self.phrase.aligned_jasmin_text[start:end]
         wav2vec= self.phrase.aligned_wav2vec_text[start:end]
-        self.aligned_cgn_text= cgn
-        self.cgn_text = cgn.replace('-','').strip()
+        self.aligned_jasmin_text= jasmin
+        self.jasmin_text = jasmin.replace('-','').strip()
         self.aligned_wav2vec_text= wav2vec
         self.wav2vec_text = wav2vec.replace('-','')
         self.wav2vec_start_time= None
@@ -355,10 +364,12 @@ class Word:
         if self.start_index == self.end_index == None: return 'bad'
         if not self.wav2vec_start_time or not self.wav2vec_end_time:
             return 'bad'
-        self.text_ok = self.cgn_text == self.text
+        self.text_ok = self.jasmin_text == self.text
         d = delta
-        self.start_ok=equal_with_delta(self.start_time,self.wav2vec_start_time,d)
-        self.end_ok = equal_with_delta( self.end_time, self.wav2vec_end_time, d)
+        self.start_ok=equal_with_delta(self.start_time,
+            self.wav2vec_start_time,d)
+        self.end_ok = equal_with_delta( self.end_time, 
+            self.wav2vec_end_time, d)
         if self.start_ok and self.end_ok: return 'good'
         if self.start_ok:  return 'start match'
         if self.end_ok:  return 'end match'
@@ -377,11 +388,11 @@ class Word:
     @property
     def match_perc(self):
         match = 0
-        nchar = len(self.aligned_cgn_text)
+        nchar = len(self.aligned_jasmin_text)
         if nchar == 0: return 0
-        texts = zip(self.aligned_cgn_text,self.aligned_wav2vec_text)
-        for cgn_char,w2v_char in texts:
-            if cgn_char == w2v_char: match += 1
+        texts = zip(self.aligned_jasmin_text,self.aligned_wav2vec_text)
+        for jasmin_char,w2v_char in texts:
+            if jasmin_char == w2v_char: match += 1
         return round(match / nchar * 100,2)
 
 
@@ -390,7 +401,7 @@ def phrase_words(phrase):
     output = []
     for word in phrase.phrase:
         w = word.awd_word
-        end = _find_end_index(w, phrase.aligned_cgn_text,start,start)
+        end = _find_end_index(w, phrase.aligned_jasmin_text,start,start)
         if not end:
             output.append([word,None,None])
         else:
@@ -521,7 +532,7 @@ def extract_all_phrases(aligns):
 
 def word_to_dataset_line(word, word_index):
     w, a = word, word.phrase.align
-    line = [word_index, a.cgn_id, a.duration, a.component,a.nspeakers]
+    line = [word_index, a.jasmin_id, a.duration, a.component,a.nspeakers]
     line.extend([w.start_index,w.end_index, w.nchars])
     line.extend([round(w.duration,2),w.start_time,w.end_time])
     line.extend([w.wav2vec_start_time,w.wav2vec_end_time])
@@ -537,7 +548,7 @@ def words_to_dataset(words):
 
 def phrase_to_dataset_line(phrase, phrase_index, randomize = None):
     p, a = phrase, phrase.align
-    line = [phrase_index,a.cgn_id, a.duration, a.component,a.nspeakers]
+    line = [phrase_index,a.jasmin_id, a.duration, a.component,a.nspeakers]
     line.extend([p.start_index,p.end_index, p.nwords])
     line.extend([round(p.duration,2),p.start_time,p.end_time])
     line.extend([p.wav2vec_start_time,p.wav2vec_end_time])
@@ -555,7 +566,7 @@ def phrases_to_dataset(phrases, randomize = None):
 
 def align_to_dataset_line(align, randomize = None):
     a = align
-    line = [a.cgn_id, a.duration, a.component, a.nspeakers]
+    line = [a.jasmin_id, a.duration, a.component, a.nspeakers]
     line.extend( [len(a.phrases), a.average_match_perc, a.perc_bad()] )
     line.extend( [a.perc_bad(1),a.perc_bad(0.1)] )
     line.append(randomize)
@@ -572,7 +583,7 @@ def load_dataset(filename):
 
 
 def load_word_dataset():
-    header = 'word_index,cgn_id,audiofile_duration,component,nspeakers'
+    header = 'word_index,jasmin_id,audiofile_duration,component,nspeakers'
     header += ',start_index,end_index,nchars,word_duration,start_time'
     header += ',end_time,wav2vec_start_time,wav2vec_end_time'
     header += ',label_0.5,match_perc'
@@ -580,7 +591,8 @@ def load_word_dataset():
     return load_dataset('../word_ds.json'), header
 
 def load_align_dataset(randomized = False):
-    header = 'cgn_id,duration,component,nspeakers,nphrases,avg_match_perc'
+    header = 'jasmin_id,duration,component,nspeakers,nphrases'
+    header = ',avg_match_perc'
     header += ',perc_bad_0.5,perc_bad_1,perc_bad_0.1'
     header = header.split(',')
     if randomized:
@@ -589,7 +601,7 @@ def load_align_dataset(randomized = False):
     return load_dataset('../align_ds.json'), header
 
 def load_phrase_dataset(randomized = False):
-    header = 'phrase_index,cgn_id,audiofile_duration,component,nspeakers'
+    header = 'phrase_index,jasmin_id,audiofile_duration,component,nspeakers'
     header += ',start_index,end_index,nwords,phrase_duration,start_time'
     header += ',end_time,wav2vec_start_time,wav2vec_end_time'
     header += ',label_0.5,label_1,label_0.1,match_perc'
@@ -601,11 +613,11 @@ def load_phrase_dataset(randomized = False):
     return load_dataset('../phrase_ds.json'), header
     
 def make_word_dataset(save = False):
-    cgn_ids = [f.split('/')[-1] for f in glob.glob(jasmin_align +'fn*')]
+    jasmin_ids = [f.split('/')[-1] for f in glob.glob(jasmin_align +'fn*')]
     word_ds = []
-    for i,cgn_id in enumerate(cgn_ids):
-        print(cgn_id,i,len(cgn_ids))
-        align = Align(cgn_id)
+    for i,jasmin_id in enumerate(jasmin_ids):
+        print(jasmin_id,i,len(jasmin_ids))
+        align = Align(jasmin_id)
         word_ds.extend( words_to_dataset(align.words ) )
     if save:
         save_dataset(word_ds,'../word_ds.json')
@@ -613,12 +625,12 @@ def make_word_dataset(save = False):
     
 
 def make_datasets(save = False):
-    cgn_ids = [f.split('/')[-1] for f in glob.glob(jasmin_align +'fn*')]
+    jasmin_ids = [f.split('/')[-1] for f in glob.glob(jasmin_align +'fn*')]
     phrase_ds = []
     align_ds = []
-    for i,cgn_id in enumerate(cgn_ids):
-        print(cgn_id,i,len(cgn_ids))
-        align = Align(cgn_id)
+    for i,jasmin_id in enumerate(jasmin_ids):
+        print(jasmin_id,i,len(jasmin_ids))
+        align = Align(jasmin_id)
         phrase_ds.extend( phrases_to_dataset(align.phrases, ) )
         align_ds.append(align_to_dataset_line(align) )
     if save:
@@ -628,13 +640,13 @@ def make_datasets(save = False):
 
 def make_randomized_text_datasets(save = False):
     directory = jasmin_align[:-1] + '_2/'
-    cgn_ids = [f.split('/')[-1] for f in glob.glob(directory +'fn*')]
+    jasmin_ids = [f.split('/')[-1] for f in glob.glob(directory +'fn*')]
     phrase_ds = []
     align_ds = []
     for n in [None,2,4,8,16,32,64]:
         print(n)
-        for cgn_id in cgn_ids:
-            align = Align(cgn_id, randomize = n)
+        for jasmin_id in jasmin_ids:
+            align = Align(jasmin_id, randomize = n)
             phrase_ds.extend( phrases_to_dataset(align.phrases, randomize=n) )
             align_ds.append( align_to_dataset_line(align, randomize=n) )
     if save:
@@ -798,24 +810,24 @@ def _check_old_dir(align):
     directory = '/'.join(align.align_filename.split('/')[:-1]) + '/'
     old_directory = directory + 'OLD/'
     if not os.path.isdir(old_directory): os.mkdir(old_directory)
-    f = old_directory + align.cgn_id
+    f = old_directory + align.jasmin_id
     print(f)
     return os.path.isfile(f)
     
-def _handle_error_align(cgn_id,n):
-    try: a = Align(cgn_id,randomize = n)
+def _handle_error_align(jasmin_id,n):
+    try: a = Align(jasmin_id,randomize = n)
     except:
-        print('fixing',cgn_id,n)
-        a = Align(cgn_id, randomize = n, make_phrases = False)
+        print('fixing',jasmin_id,n)
+        a = Align(jasmin_id, randomize = n, make_phrases = False)
         _mv_error_random_align(a)
-        a = Align(cgn_id, randomize = n, make_phrases = False)
-        _handle_error_align(cgn_id,n)
-    else:print(cgn_id,n,'ok')
+        a = Align(jasmin_id, randomize = n, make_phrases = False)
+        _handle_error_align(jasmin_id,n)
+    else:print(jasmin_id,n,'ok')
     
 def handle_all_error_align(n = []):
     directory = jasmin_align[:-1] + '_2/'
-    cgn_ids = [f.split('/')[-1] for f in glob.glob(directory +'fn*')]
-    random.shuffle(cgn_ids)
+    jasmin_ids = [f.split('/')[-1] for f in glob.glob(directory +'fn*')]
+    random.shuffle(jasmin_ids)
     phrase_ds = []
     align_ds = []
     if not n:
@@ -824,8 +836,8 @@ def handle_all_error_align(n = []):
     random.shuffle(randomizes)
     for n in randomizes:
         print(n)
-        for cgn_id in cgn_ids:
-            _handle_error_align(cgn_id,n)
+        for jasmin_id in jasmin_ids:
+            _handle_error_align(jasmin_id,n)
         
 
 
