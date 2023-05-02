@@ -550,16 +550,6 @@ def make_datasets(save = False):
     return phrase_ds, align_ds
 
 
-def cgn_component_names():
-    d= {'a':'spontaneous dialogues','b':'interviews'}
-    d.update({'c':'telephone dialogues','d':'telephone dialogues'})
-    d.update({'e':'business negotiations'})
-    d.update({'f':'broadcast interviews','g':'debates'})
-    d.update({'h':'classes','i':'broadcast commentaries'})
-    d.update({'j':'newsroom and documentaries','k':'news broadcast'})
-    d.update({'l':'reflections','n':'lectures and speeches'})
-    d.update({'o':'read-aloud stories'})
-    return d
         
 def perc_bad_duration_plot(alpha = .2):
     ds, header = load_align_dataset()
@@ -577,7 +567,7 @@ def perc_bad_duration_plot(alpha = .2):
         dur = [x[di] for x in temp]
         perc = [x[pi] for x in temp]
         plt.scatter(dur,perc,alpha=alpha)
-    component_names = [cgn_component_names()[comp] for comp in comps]
+    component_names = ['p','q']
     leg = plt.legend(component_names)
     for lh in leg.legendHandles:
         lh.set_alpha(1)
@@ -635,12 +625,14 @@ def plot_delta_histogram_words(dstart,dend):
 def plot_delta_histogram(dstart, dend, ylabel = 'phrase counts'):
     s = [x for x in dstart if x < 1 and x > -1]
     e = [x for x in dend if x < 1 and x > -1]
-    plt.figure()
+    fig = plt.figure()
     plt.hist(s,bins=100,alpha = 0.5,color='blue')
     plt.hist(e,bins=100,alpha = 0.5,color='red')
     plt.legend(['start delta','end delta'])
     plt.xlabel('seconds')
     plt.ylabel(ylabel)
+    return fig
+
     
 
 def _make_index_mapping_aligned_text(aligned_text):
