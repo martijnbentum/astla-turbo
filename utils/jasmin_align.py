@@ -46,7 +46,7 @@ def table_filename_to_jasmin_id(f):
     jasmin_id = f.split('/')[-1].split('.')[0]
     return jasmin_id
 
-def make_alignments(small_set = False, randomize = None, component = None):
+def make_alignments(small_set = False, component = None):
     from texts.models import Jasmin_recording
     if not small_set: fn = table_filenames()
     else: fn = _select_10_perc_table_filenames()
@@ -58,53 +58,20 @@ def make_alignments(small_set = False, randomize = None, component = None):
             if jr.component() != component: 
                 print('skipping',jr.awd_filename)
                 continue
-        if randomize:
-            directory = jasmin_align[:-1] + '_' + str(randomize) + '/'
-        else: 
-            directory = jasmin_align
-        align_filename = directory+jasmin_id 
+        align_filename = jasmin_align+jasmin_id 
         if os.path.isfile(align_filename): 
-            print('skiping',jasmin_id, small_set, randomize, len(fn))
+            print('skiping',jasmin_id, small_set, len(fn))
             continue
-        print('handling',jasmin_id, small_set, randomize, len(fn))
-        Align(jasmin_id, make_phrases = False, randomize = randomize)
-
-def make_all_randomized_alignments():
-    rv = [2,4,8,16,32,64]
-    random.shuffle(rv)
-    print(rv)
-    for r in rv:
-        print('-'*80)
-        print('start with:',r)
-        print('-'*80)
-        make_alignments(small_set = True,randomize = r)
-
-        
-def randomize_text(text, random_perc):
-    nchar = len(text)
-    chars = set(text)
-    if nchar < 2: return text
-    if random_perc > 1: random_perc /= 100
-    sample = int(nchar * random_perc)
-    if sample == 0: sample = 1
-    print(nchar,sample,random_perc)
-    indices = random.sample(list(range(nchar)), sample)
-    output = ''
-    for i, char in enumerate(text):
-        if i in indices: 
-            c = random.sample(list(chars - set(char)), 1)[0]
-            output += c
-        else: output += char
-    return output
+        print('handling',jasmin_id, small_set, len(fn))
+        Align(jasmin_id, make_phrases = False )
 
 
     
 class Align:
     '''align object to align jasmin recoring and wav2vec transcript.
     '''
-    def __init__(self,jasmin_id, make_phrases = True, randomize = None):
+    def __init__(self,jasmin_id, make_phrases = True):
         self.jasmin_id = jasmin_id
-        self.randomize = randomize
         self.recording= Jasmin_recording.objects.get(identifier = jasmin_id)
         self.awd_words = list(self.recording.jasmin_word_set.all())
         # self.awd_text = ' '.join([w.awd_word for w in self.awd_words])
@@ -122,21 +89,13 @@ class Align:
         self.wav2vec_text = load_text(self.wav2vec_base_filename+'.txt')
 
     def _set_align(self):
-        if self.randomize: 
-            directory = jasmin_align[:-1] + '_' + str(self.randomize) + '/'
-            if not os.path.isdir(directory): os.mkdir(directory)
-            temp = randomize_text(self.awd_text.lower(), self.randomize)
-            jasmin_text = temp
-        else:
-            directory = jasmin_align
-            jasmin_text = self.awd_text
+        directory = jasmin_align
+        jasmin_text = self.awd_text
         self.align_filename = directory + self.jasmin_id
         print(self.align_filename)
         if os.path.isfile(self.align_filename): 
             with open(self.align_filename) as fin:
                 self.align = fin.read()
-            if self.randomize:
-                self.awd_text = self.align.split('\n')[0].replace('-','')
         else:
             self.align = nw.nw(jasmin_text, self.wav2vec_text)
             with open(self.align_filename, 'w') as fout:
@@ -145,12 +104,8 @@ class Align:
     def _set_phrases(self):
         phrases = sort_phrases(self.recording.phrases())
         self.words = []
-        if self.randomize:
-            o = align_phrases_with_randomized_aligned_text(phrases,
-                self.awd_text, self.aligned_jasmin_text)
-        else:
-            o = align_phrases_with_aligned_text(phrases,
-                self.aligned_jasmin_text)
+        o = align_phrases_with_aligned_text(phrases,
+            self.aligned_jasmin_text)
         self.phrases = []
         for phrase, start_index, end_index in o:
             p = Phrase(phrase,self,start_index, end_index)
@@ -442,51 +397,7 @@ def align_phrases_with_aligned_text(phrases, text):
             start = end
     return output
 
-def _find_end_index_random_text(phrase_text, text, start_index, end_index,
-    old_ndash):
-    if end_index < start_index + len(phrase_text):
-        end_index = start_index + len(phrase_text)
-    ndash = text[start_index:end_index].count('-')
-    end_index += (ndash - old_ndash)
-    if ndash > old_ndash: 
-        return _find_end_index_random_text(phrase_text,text,start_index,
-            end_index, ndash)
-    return end_index, ndash
 
-def align_phrases_with_randomized_aligned_text(phrases, text, aligned_text):
-    output = []
-    start = 0
-    start_aligned = 0
-    aligned_text = set_phrase_boundaries_to_space(phrases,text,aligned_text)
-    for i,phrase in enumerate(phrases):
-        pt = phrase_to_text(phrase)
-        end = start + len(pt)
-        ptr = text[start:end]
-        # print('ptr:',[ptr],start,end,len(ptr),i)
-        # print([aligned_text[start_aligned:start_aligned+len(ptr)]],start_aligned)
-        # end, ndash = _find_end_index_random_text(pt,text,start,start,0)
-        end_aligned = _find_end_index(ptr,aligned_text,start_aligned,start_aligned)
-        # print(pt)
-        # print(text[start:end], start, end, len(pt),len(text[start:end])) 
-        # print(aligned_text[start_aligned:end_aligned],start_aligned,end_aligned)
-        # ndash)
-        # print(' ')
-        output.append([phrase,start_aligned,end_aligned])
-        start_aligned = end_aligned +1
-        start = end +1
-    return output
-
-def align_phrases_with_random_text(phrases,text):
-    output = []
-    start = 0
-    start_aligned = 0
-    for phrase in phrases:
-        pt = phrase_to_text(phrase)
-        end = start + len(pt)
-        ptr = text[start:end]
-        output.append([phrase,pt,ptr, start, end])
-        start = end + 1
-    return output
 
 
 
@@ -638,21 +549,6 @@ def make_datasets(save = False):
         save_dataset(align_ds,'../align_ds.json')
     return phrase_ds, align_ds
 
-def make_randomized_text_datasets(save = False):
-    directory = jasmin_align[:-1] + '_2/'
-    jasmin_ids = [f.split('/')[-1] for f in glob.glob(directory +'fn*')]
-    phrase_ds = []
-    align_ds = []
-    for n in [None,2,4,8,16,32,64]:
-        print(n)
-        for jasmin_id in jasmin_ids:
-            align = Align(jasmin_id, randomize = n)
-            phrase_ds.extend( phrases_to_dataset(align.phrases, randomize=n) )
-            align_ds.append( align_to_dataset_line(align, randomize=n) )
-    if save:
-        save_dataset(phrase_ds,'../phrase_randomized_text_ds.json')
-        save_dataset(align_ds,'../align_randomized_text_ds.json')
-    return phrase_ds, align_ds
 
 def cgn_component_names():
     d= {'a':'spontaneous dialogues','b':'interviews'}
@@ -689,16 +585,6 @@ def perc_bad_duration_plot(alpha = .2):
     plt.ylabel('% incorrectly aligned phrases')
     return leg, component_names
 
-def get_all_speech_types():
-    d = {'spontaneous':'a,b,c,d,e,h'.split(',')}
-    d['prepared']='f,g,h,i,l,n'.split(',')
-    d['read'] = ['j','k','o']
-    return d
-
-def get_speech_type(component, speech_types):
-    for label, components in speech_types.items():
-        if component in components: return label
-    raise ValueError(component,'not found', speech_types)
 
 
 def multiple_regression_ds(ads,header):
