@@ -155,6 +155,7 @@ class Session(models.Model):
     nwords= models.IntegerField(default=0)
     align = models.TextField(default='')
     whisper_align = models.TextField(default='')
+    whisper_dis_align = models.TextField(default='')
     dataset = models.CharField(max_length=50,default='')
     multiple_dart_correctors = models.BooleanField(default = False)
     train_dev_test = models.CharField(max_length=5,default='')
@@ -228,6 +229,7 @@ class Word(models.Model):
     duration = models.FloatField(default = 0.0)
     word_time_information_available= models.BooleanField(null=True)
     whisper_info = models.TextField(default = '')
+    whisper_dis_info = models.TextField(default = '')
     egemap_features = models.TextField(default = '')
     kaldi_fd_confidence = models.FloatField(default = 0.0)
 
