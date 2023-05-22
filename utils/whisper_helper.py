@@ -1,31 +1,48 @@
 if not __name__ == '__main__':
     from . import session_helper
-import unittest
 import Levenshtein
+from . import needleman_wunch
+import unittest
     
-whisper_dis_dir = '/vol/tensusers4/ctejedor/shared/dart-whisper-prompts-dis/'
+def _add_whisper_dis_align_to_session(session, version = 'whisper_dis_json'):
+    _add_whisper_align_to_session(session,version)
 
-def _add_whisper_align_to_session(session):
-    o = session.whisper_json()
-    if not o:
-        print('cannot find whisper output')
-        return
+def _add_whisper_align_to_session(session, version = 'whisper_json'):
+    print('version:',version, session)
+    if not json_available(session, version): return False
     gt = ground_truth(session)
-    whisper_words = whisper_helper.extract_all_words(o)
-    hyp, indices = whisper_helper.whisper_words_to_string(whisper_words)
-    session.whisper_align = needleman_wunch.nw(gt,hyp)
+    hyp, indices = whisper_words_to_string_indices(session,version)
+    if version == 'whisper_dis_json': attr = 'whisper_dis_align'
+    else: attr= 'whisper_align'
+    setattr(session,attr,needleman_wunch.nw(gt,hyp))
     session.save()
 
-def extract_all_whisper_words(session):
+def extract_all_whisper_words_dis_version(session, remove_doubles = True):
+    temp = extract_all_whisper_words(session, 'whisper_dis_json')
+    words, disfluencies = [], []
+    for d in temp:
+        if d['text'] == '[*]': disfluencies.append(d)
+        else: words.append(d)
+    if remove_doubles: words = remove_double_words(words)
+    return words, disfluencies
+
+def extract_all_whisper_words(session, version = 'whisper_json'):
     words = []
-    o = session.whisper_json()
+    if not json_available(session, version): return False
+    o = getattr(session,version)()
     if not o:return False
+    if not 'segments' in o.keys(): []
     for segment in o['segments']:
+        if not 'words' in segment.keys(): continue
         words.extend(segment['words'])
     return words
 
-def whisper_words_to_string_indices(session):
-    whisper_words = extract_all_whisper_words(session)
+def whisper_words_to_string_indices(session, version = 'whisper_json'):
+    if not json_available(session, version): return False, False
+    if version == 'whisper_dis_json':
+        whisper_words, _ = extract_all_whisper_words_dis_version(session)
+    else:
+        whisper_words = extract_all_whisper_words(session, version)
     words = []
     word_start_end_indices = []
     start, end = 0,0
@@ -39,14 +56,33 @@ def whisper_words_to_string_indices(session):
     return t, word_start_end_indices
     
 
-def match_whisper_words_and_word_list(session, save = False):
-    whisper_words = extract_all_whisper_words(session)
+def match_whisper_words_and_word_list_dis_version(session, save = False):
+    return match_whisper_words_and_word_list(session, save,
+    version = 'whisper_dis_json')
+
+def json_available(session, version = 'whisper_json'):
+    o = getattr(session,version)()
+    if not o:
+        print('cannot find whisper output')
+        return False
+    return True
+
+def match_whisper_words_and_word_list(session, save = False, 
+    version = 'whisper_json'):
+    if not json_available(session, version): return False
+    if version == 'whisper_dis_json':
+        whisper_words, _ = extract_all_whisper_words_dis_version(session)
+    else:
+        whisper_words = extract_all_whisper_words(session, version)
     if not whisper_words:
         print('could not extract whisper words')
         return
-    t,i = whisper_words_to_string_indices(session)
+    print('version:',version, session)
+    t,i = whisper_words_to_string_indices(session, version)
     words = session_helper.to_words(session)
-    gt, hyp = session.whisper_align.split('\n')
+    if version == 'whisper_dis_json': attr = 'whisper_dis_align'
+    else: attr = 'whisper_align'
+    gt, hyp = getattr(session,attr).split('\n')
     indices = find_indices(gt)
     hyp_bar = replace_char_at_index(hyp, indices)
     gt_aligned_words = gt.split(' ')
@@ -59,7 +95,10 @@ def match_whisper_words_and_word_list(session, save = False):
         char_start_end_indices = start_end_indices[index]
         w_words,ww_indices =find_whisper_words(char_start_end_indices,hyp,i, 
             word,whisper_words)
+        print(word)
+        print(w_words)
         w_word, w_word_index = prune_whisper_words(w_words, word, ww_indices)
+        print(index,w_word,word, '<---', char_start_end_indices)
         if not w_word:
             print('could not find match',w_word)
             continue
@@ -67,9 +106,13 @@ def match_whisper_words_and_word_list(session, save = False):
             ww_indices, w_word_index)
         db_word = session.word_set.get(index = index)
         if save:
-            db_word.whisper_info = str(w_word)
+            if version == 'whisper_dis_json': attr = 'whisper_dis_info'
+            else: attr = 'whisper_info'
+            print('saving to attr', attr)
+            setattr(db_word, attr, str(w_word) ) 
             db_word.save()
         matches.append([db_word,w_word])
+        print('')
     return matches
 
 def add_info(w_word,wl_word, char_start_end_indices, 
@@ -145,9 +188,28 @@ def prune_whisper_words(w_words, wl_word, whisper_word_indices):
         
             
     
-    ratio =Levenshtein.ratio(gt_aligned_word,hyp_aligned_word)
+    # ratio =Levenshtein.ratio(gt_aligned_word,hyp_aligned_word)
     
 
+def ground_truth(session):
+    return session.word_list.replace(',', ' ').lower()
+
+def has_highest_confidence(whisper_words, word):
+    confidence = word['confidence']
+    highest = True
+    for w in whisper_words:
+        if w['text'] != word['text']: continue
+        if w['confidence'] > confidence: highest = False
+    return highest
+
+def remove_double_words(whisper_words):
+    output = []
+    words = [x['text'] for x in whisper_words]
+    for i,word in enumerate(whisper_words):
+        t = word['text']
+        if words.count(t) == 1: output.append(word) 
+        elif has_highest_confidence(whisper_words,word): output.append(word)
+    return output
 
 def match_start_end_indices(indices_set, start,end):
     '''find the whisper word index (or indices) corresponding to a 
