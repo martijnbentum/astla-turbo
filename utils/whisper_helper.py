@@ -3,6 +3,7 @@ if not __name__ == '__main__':
 import unittest
 import Levenshtein
     
+whisper_dis_dir = '/vol/tensusers4/ctejedor/shared/dart-whisper-prompts-dis/'
 
 def _add_whisper_align_to_session(session):
     o = session.whisper_json()
