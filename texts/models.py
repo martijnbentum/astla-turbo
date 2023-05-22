@@ -174,6 +174,14 @@ class Session(models.Model):
             return json.load(open(f))
         print('could not find',f)
 
+    def whisper_dis_json(self):
+        f = '../WHISPER_DART/whisper-prompts-dis/'
+        f += self.identifier.split('/')[-1].split('.')[0]
+        f += '.json'
+        if os.path.isfile(f):
+            return json.load(open(f))
+        print('could not find',f)
+
     @property
     def n_correctors(self):
         if not self.multiple_dart_correctors: return 1
