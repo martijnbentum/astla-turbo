@@ -13,15 +13,20 @@ def make_levenshtein_dataset(levenshtein_type = 'wav2vec'):
     elif levenshtein_type == 'whisper':
         X_train = np.array([get_whisper_levenshtein_ratio(w) for w in train])
         X_test= np.array([get_whisper_levenshtein_ratio(w) for w in test])
+    elif levenshtein_type == 'whisper_dis':
+        gwlr = get_whisper_levenshtein_ratio
+        X_train= [gwlr(w,'whisper_dis_info') for w in train]
+        X_test= [gwlr(w) for w in test]
     else:raise ValueError(levenshtein_ratio,'unknown')
     y_train = np.array([word.correct for word in train])
     y_test= np.array([word.correct for word in test])
     return X_train, X_test, y_train, y_test
 
 
-def get_whisper_levenshtein_ratio(word):
-    if not word.whisper_info: return 0
-    return eval(word.whisper_info)['levenshtein_ratio']
+def get_whisper_levenshtein_ratio(word, whisper_version = 'whisper_info'):
+    v = getattr(word,whisper_version)
+    if not v: return 0
+    return eval(v)['levenshtein_ratio']
 
 def compute_levenshtein_ratio_density_for_correct_incorrect_words(cw,icw,
     levenshtein_type = 'wav2vec'):
@@ -32,6 +37,10 @@ def compute_levenshtein_ratio_density_for_correct_incorrect_words(cw,icw,
     elif levenshtein_type == 'whisper':
         correct = [get_whisper_levenshtein_ratio(w) for w in correct_words]
         incorrect = [get_whisper_levenshtein_ratio(w) for w in incorrect_words]
+    elif levenshtein_type == 'whisper_dis':
+        gwlr = get_whisper_levenshtein_ratio
+        correct = [gwlr(w,'whisper_dis_info') for w in correct_words]
+        incorrect = [gwlr(w) for w in incorrect_words]
     else:raise ValueError(levenshtein_ratio,'unknown')
     density_correct = stats.kde.gaussian_kde(correct)
     density_incorrect = stats.kde.gaussian_kde(incorrect)

@@ -13,14 +13,20 @@ def make_confidence_dataset(confidence_type = 'wispher'):
     if confidence_type== 'kaldi':
         X_train = np.array([get_kaldi_confidence(w) for w in train])
         X_test= np.array([get_kaldi_confidence(w) for w in test])
+    elif confidence_type == 'whisper_dis':
+        gwc = get_whisper_confidence
+        X_train= [gwc(w,'whisper_dis_info') for w in train]
+        X_test= [gwc(w,'whisper_dis_info') for w in test]
     else:raise ValueError(confidence_type,'unknown')
     y_train = np.array([word.correct for word in train])
     y_test= np.array([word.correct for word in test])
     return X_train, X_test, y_train, y_test
 
-def get_whisper_confidence(word):
-    if not word.whisper_info: return 0
-    return eval(word.whisper_info)['confidence']
+def get_whisper_confidence(word, whisper_version = 'whisper_info'):
+    v = getattr(word,whisper_version)
+    if not v: return 0
+    return eval(v)['confidence']
+
 
 def get_kaldi_confidence(word):
     return word.kaldi_fd_confidence
@@ -35,6 +41,10 @@ def compute_confidence_density_for_correct_incorrect_words(cw,icw,
     elif confidence_type == 'kaldi':
         correct = [get_kaldi_confidence(w) for w in correct_words]
         incorrect = [get_kaldi_confidence(w) for w in incorrect_words]
+    elif confidence_type == 'whisper_dis':
+        gwc = get_whisper_confidence
+        correct = [gwc(w,'whisper_dis_info') for w in correct_words]
+        incorrect = [gwc(w, 'whisper_dis_info') for w in incorrect_words]
     else:raise ValueError(confidence_type,'unknown')
     density_correct = stats.kde.gaussian_kde(correct)
     density_incorrect = stats.kde.gaussian_kde(incorrect)
