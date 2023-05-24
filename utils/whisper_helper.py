@@ -3,6 +3,41 @@ if not __name__ == '__main__':
 import Levenshtein
 from . import needleman_wunch
 import unittest
+from matplotlib import pyplot as plt
+from collections import Counter
+
+def compute_percentage_of_session_with_nincorrect_words(nincorrects):
+    c = Counter(nincorrects)
+    x, y = [], []
+    total = sum(c.values())
+    for key in sorted(c.keys()):
+        value = c[key]
+        x.append(key)
+        y.append(round(value/total*100,2))
+    return x,y
+
+def scatter_plot_correct_disfluencies(nincorrects = [], ndisfluencies = [],
+    return_output = False):
+    from texts.models import Session
+    if not nincorrects or not ndisfluencies:
+        for x in Session.objects.all():
+            if not json_available(x, version = 'whisper_dis_json'): continue
+            words, disfluencies = extract_all_whisper_words_dis_version(x)
+            nincorrects.append(x.nwords - x.ncorrect)
+            ndisfluencies.append(len(disfluencies))
+    x,y = compute_percentage_of_session_with_nincorrect_words(nincorrects)
+    plt.clf()
+    plt.ion()
+    plt.scatter(nincorrects,ndisfluencies, alpha = 0.09)
+    plt.plot(x,y, color = 'orange')
+    plt.xlabel('number of words labeled incorrect')
+    plt.ylabel('number disfluencies in detected by whisper')
+    plt.legend(['session','% sessions with # incorrect words'])
+    plt.show()
+    if return_output:return nincorrects, ndisfluencies
+        
+    
+    
     
 def _add_whisper_dis_align_to_session(session, version = 'whisper_dis_json'):
     _add_whisper_align_to_session(session,version)
