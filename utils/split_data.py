@@ -215,7 +215,6 @@ def select_files_sa(n_files, sa_name, version = 1, overwrite = False):
     sessions = sessions.exclude(pk__in = exclude)
     sessions = random.sample(list(sessions), n_files)
     directory= '../' + sa_name + '_v' + str(version) + '/'
-    dart_mp3 = '../dart_mp3/'
     if os.path.isdir(directory) and overwrite:
         _overwrite_exclude(directory)
         shutil.rmtree(directory)
@@ -225,11 +224,21 @@ def select_files_sa(n_files, sa_name, version = 1, overwrite = False):
         print('directory',directory,'already exists',
             ' use overwrite=true or other version != (',version,')' )
         return
+    _make_files_for_transcriptions(sessions,directory)
+
+def _make_files_for_transcriptions(sessions, directory):
+    dart_mp3 = '../dart_mp3/'
     for s in sessions:
         os.system('cp ' + dart_mp3 + s.audio_filename +' ' + directory)
     _add_exclude(sessions,directory)
     _make_wordlist(sessions,directory)
     _generate_textgrids(directory)
+    
+
+def make_multiple_corrector_files():
+    directory = '../multiple_corrector_files/'
+    sessions = Session.objects.filter(train_dev_test = 'multiple correctors')
+    _make_files_for_transcriptions(sessions,directory)
     
     
     
