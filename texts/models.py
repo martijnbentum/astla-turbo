@@ -190,6 +190,7 @@ class Session(models.Model):
 
     @property
     def teacher_to_correct_list_dict(self):
+        d = {}
         if not self.multiple_dart_correctors: 
             d[self.teacher.identifier] = self.correct_list 
         if hasattr(self,'_teacher_to_correct_list_dict'):
