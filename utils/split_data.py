@@ -116,6 +116,12 @@ def save_split(split_dict):
     with open('../train_dev_test_split_dart.txt','w') as fout:
         fout.write('\n'.join(o))
 
+def _save_split_on_pupils():
+    sessions = Session.objects.all()
+    for session in sessions:
+        pupil = session.pupil
+        pupil.train_dev_test = session.train_dev_test
+        pupil.save()
 
 def _save_split_on_words():
     words = Word.objects.filter(dataset = 'dart')
