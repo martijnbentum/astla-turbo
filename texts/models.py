@@ -219,6 +219,8 @@ class Word(models.Model):
     word = models.CharField(max_length= 100, default = '') 
     gt_aligned_word = models.CharField(max_length= 100, default = '') 
     hyp_aligned_word = models.CharField(max_length= 100, default = '') 
+    whisper_hyp_aligned= models.CharField(max_length= 100, default = '') 
+    whisper_dis_hyp_aligned= models.CharField(max_length= 100, default = '') 
     span = models.CharField(max_length= 100, default = '') 
     levenshtein_distance= models.IntegerField(default=0)
     levenshtein_ratio = models.FloatField(default = 0.0)
@@ -241,7 +243,6 @@ class Word(models.Model):
         m =  self.word + ' ' + self.hyp_aligned_word + ' ' 
         m += str(self.correct) + ' ' + str(self.index)
         return m
-
 
 
     
