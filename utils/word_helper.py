@@ -137,3 +137,33 @@ def plot_hist_words():
     plt.ylabel('counts')
     plt.savefig('../histo_gram_of_word_durations')
     
+
+def add_whisper_align_to_word(word):
+    if not word.whisper_info: return
+    d = eval(word.whisper_info)
+    start, end = d['char_start_end_indices']
+    wa = word.session.whisper_align.split('\n')[1][start:end]
+    word.whisper_hyp_aligned = wa
+
+def add_whisper_disfluency_align_to_word(word):
+    if not word.whisper_dis_info: return
+    d = eval(word.whisper_dis_info)
+    start, end = d['char_start_end_indices']
+    wa = word.session.whisper_dis_align.split('\n')[1][start:end]
+    word.whisper_dis_hyp_aligned = wa
+    
+def add_whisper_hyp_alignments(word):
+    add_whisper_align_to_word(word)
+    add_whisper_disfluency_align_to_word(word)
+
+def print_aligned_text(word):
+    d = eval(word.whisper_dis_info)
+    start, end = d['char_start_end_indices']
+    start = start -10
+    if start < 0: start = 0
+    end = end + 10
+    gt, hyp = word.session.whisper_align.split('\n')
+    print(gt[start:end])
+    print(hyp[start:end])
+
+
