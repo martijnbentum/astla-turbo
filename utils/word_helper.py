@@ -2,37 +2,16 @@ from texts.models import Session, Word
 from utils import session_helper
 from matplotlib import pyplot as plt
 
-def word_to_line(word):
-    '''creates a a list of word information for a single word.'''
-    o = []
-    o.append(word.pk)
-    o.append(word.session.pk)
-    o.append(word.index)
-    o.append(word.word)
-    o.append(word.correct)
-    o.append(round(word.levenshtein_ratio,3))
-    o.append(word.session.audio_filename)
-    o.append(word.start_time)
-    o.append(word.end_time)
-    o.append(round(word.duration,3))
-    o.append(int(word.word_time_information_available))
+def word_to_teacher_correctness_dict(word):
+    d = word.session.teacher_to_correct_list_dict
+    o = {}
+    for teacher_identifier, correct_list in d.items():
+        o[teacher_identifier] = correct_list[word.index]
     return o
-
+        
+        
 def word_duration(word):
     return word.end_time - word.start_time
-
-
-def make_word_info_file():
-    '''function to make word info file with start end times for words.'''
-    output = []
-    for word in Word.objects.all():
-        line = list(map(str,word_to_line(word)))
-        output.append('\t'.join(line))
-    with open('../dart_word_info_file.txt','w') as fout:
-        fout.write('\n'.join(output))
-    return output
-        
-
 
 def _set_all_start_end_times_words(start_index = 0):
     '''set the start and end time of each word in all sessions'''
