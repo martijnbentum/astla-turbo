@@ -1,13 +1,16 @@
 from texts.models import Session
+import random
 import numpy as np
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, matthews_corrcoef
+import pickle
 
 
 
-def header():
+def get_header():
     h = 'word,correct,session_id,pupil_id,teacher_id,core_set'
     h += ',word_id,other_ratings_continuous,other_ratings_majority_rules'
-    h += ',other_ratings_tied,all_ratings_continous,all_ratings_majority_rules'
+    h += ',other_ratings_tied,all_ratings_continous'
+    h += ',all_ratings_majority_rules'
     h += ',all_ratings_tied,n_ratings,other_ratings_str'
     h = h.split(',')
     return h
@@ -82,7 +85,7 @@ def handle_session(session):
 
 def make_dataset(save = False):
     s = Session.objects.all()
-    output = [header()]
+    output = [get_header()]
     for x in s:
         if not has_multiple_teacher_ratings(x): continue
         output.extend(handle_session(x))
@@ -102,7 +105,7 @@ def _convert(values):
 def convert_dataset(output = None):
     if not output: output = make_dataset(False)
     output = [line for line in output[1:] if line]
-    h= header()
+    h= get_header()
     i_rating = h.index('n_ratings')
     i_teacher = h.index('teacher_id')
     i_word= h.index('word_id')
@@ -120,22 +123,161 @@ def convert_dataset(output = None):
             d[nratings]['tid_'+tid]['hyp'] = _convert(hyp) 
             d[nratings]['tid_'+tid]['gt'] = gt 
         word_ids,hyp, gt= [], [],[]#list(set([line[i_word] for line in temp]))
+        all_hyp, all_gt = [], [] 
         for line in temp:
             word_id = line[i_word]
             if word_id not in word_ids:
                 hyp.append(line[i_correct])
                 gt.append(int(line[i_mr]))
                 word_ids.append(word_id)
+            all_hyp.append(line[i_correct])
+            all_gt.append(int(line[i_mr]))
         d[nratings]['hyp'] = _convert(hyp)
         d[nratings]['gt'] = gt
+        d[nratings]['all_hyp'] = _convert(all_hyp)
+        d[nratings]['all_gt'] = all_gt
     return d
             
 
 def classification_report(output = None):
     if not output: output = make_dataset(False)
     d = convert_dataset(output)
+
+def compute_mcc_for_51_teachers(d = None):
+    if not d: d = convert_dataset()
+    mccs = []
+    for teacher_id in d[51].keys():
+        if not 'tid' in teacher_id: continue
+        temp = d[51][teacher_id]
+        gt, hyp = temp['gt'], temp['hyp']
+        mcc = matthews_corrcoef(gt, hyp)
+        mccs.append(mcc)
+    return mccs
     
+
+
+class Data:
+    def __init__(self, output = None, n_ratings = None):
+        if not output: output = make_dataset(False)
+        self.header = output[0]
+        self._data_raw = output[1:]
+        self._set_info()
+        if n_ratings: self._select_data_with_n_raters(n_ratings)
+
+
+    def __repr__(self):
+        return 'Data: ' + str(len(self.data))
+
+    def _set_info(self):
+        self.data = []
+        for line in self._data_raw:
+            self.data.append(Dataline(line, self.header))
+            
+    def _select_data_with_n_raters(self, n_ratings):
+        output = []
+        for line in self.data:
+            if line.n_ratings == n_ratings: output.append(line)
+        self.data = output
+
+    def make_dataset_with_bootstrapped_other_ratings(self,n_other_raters,
+        apply_majority_rules = True, select_teacher_id = None):
+        hyp, gt = [], []
+        for line in self.data:
+            if select_teacher_id and select_teacher_id != line.teacher_id:
+                # print(select_teacher_id,'skipping',line.teacher_id)
+                continue
+            hyp.append( line.correct )
+            gt.append( line.bootstrap_other_ratings(n_other_raters,
+                apply_majority_rules) )
+        return gt, hyp
+
+    def compute_bootstrapped_mccs(self,n_other_raters, n_bootstraps = 1000,
+        select_teacher_id = None):
+        mccs = []
+        check = []
+        for _ in range(n_bootstraps):
+            gt, hyp = self.make_dataset_with_bootstrapped_other_ratings(
+                n_other_raters, select_teacher_id = select_teacher_id)
+            mccs.append( matthews_corrcoef(gt, hyp) )
+            check.append([gt,hyp])
+        return mccs, check
+
+    @property
+    def teacher_ids(self):
+        output = []
+        for line in self.data:
+            tid = line.teacher_id
+            if tid not in output: output.append(tid)
+        return output
     
         
+            
 
+class Dataline:
+    def __init__(self,line, header):
+        self.header = header
+        self.line = line
+        self._set_info()
+
+    def __repr__(self):
+        return 'Dataline: ' + self.word + ' ' + str(self.n_ratings)
     
+    def _set_info(self):
+        for name, value in zip(self.header,self.line):
+            if name == 'correct':
+                value = 1 if value == 'TRUE' else 0
+            if name == 'n_ratings': value = int(value)
+            if name == 'other_ratings_str':
+                name = 'other_ratings'
+                value = list(map(int,value.split(',')))
+            setattr(self,name,value)
+
+    def bootstrap_other_ratings(self, n_other_raters, 
+        apply_majority_rules = True):
+        other_ratings = random.choices(self.other_ratings,
+            k = n_other_raters)
+        if apply_majority_rules:
+            return majority_rules(other_ratings)
+        return other_ratings
+            
+        
+
+        
+def majority_rules(values):
+    value = np.mean(values)
+    if value >= .5: return 1
+    return 0
+        
+    
+def bootstrap_classification(output = None, n_bootstraps = 1000,
+    filename = '../bootstrap_classification.pickle', save = True): 
+    data = Data(output)
+    teacher_ids = data.teacher_ids + [None]
+    n_other_raters = list(range(1,52))
+    d = {}
+    for n_raters in n_other_raters:
+        d[n_raters] = {}
+        for tid in teacher_ids:
+            d[n_raters][tid] = {}
+            mccs, check = data.compute_bootstrapped_mccs(n_raters,
+                n_bootstraps = n_bootstraps, select_teacher_id = tid)
+            d[n_raters][tid]['mccs'] = mccs 
+            d[n_raters][tid]['check'] = check
+            d[n_raters][tid]['mean_mccs'] = np.mean(mccs)
+            if tid == None:
+                print('n raters:',n_raters,'teacher_id',tid,'mccs',
+                    np.mean(mccs))
+    if save:
+        save_pickle(d, filename)
+    return d
+
+def load_bootstrap_classification(
+    filename = '../bootstrap_classification.pickle'):
+    with open(filename, 'rb') as fin:
+        d = pickle.load(fin)
+    return d
+
+def save_pickle(obj, filename):
+    with open(filename,'wb') as fout:
+        pickle.dump(obj,fout)
+            
