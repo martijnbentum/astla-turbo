@@ -3,6 +3,7 @@ import random
 import numpy as np
 from sklearn.metrics import classification_report, matthews_corrcoef
 import pickle
+from matplotlib import pyplot as plt
 
 
 
@@ -249,9 +250,10 @@ def majority_rules(values):
     return 0
         
     
-def bootstrap_classification(output = None, n_bootstraps = 1000,
-    filename = '../bootstrap_classification.pickle', save = True): 
-    data = Data(output)
+def bootstrap_classification(output = None, n_bootstraps = 100,
+    filename = '../bootstrap_classification.pickle', save = False): 
+    data = Data(output, 51)
+    print(len(data.data), 'ndatalines')
     teacher_ids = data.teacher_ids + [None]
     n_other_raters = list(range(1,52))
     d = {}
@@ -280,4 +282,62 @@ def load_bootstrap_classification(
 def save_pickle(obj, filename):
     with open(filename,'wb') as fout:
         pickle.dump(obj,fout)
+
+def get_mccs_boostrap_stats(d = None, teacher_id = None, plot = True):
+    if not d: d = load_bootstrap_classification()
+    minimum, maximum, mean, median = [],[],[],[]
+    for n_raters, value in d.items():
+        mccs = value[teacher_id]['mccs']
+        minimum.append(np.min(mccs))
+        maximum.append(np.max(mccs))
+        median.append(np.median(mccs))
+        mean.append(np.mean(mccs))
+    if plot: 
+        plot_bootstrapped_mccs(minimum,maximum,median,mean, teacher_id)
+    return minimum, maximum,median, mean
+
+def plot_bootstrapped_mccs(minimum, maximum, median, mean, teacher_id):
+    plt.clf()
+    nraters = list(range(1,52))
+    plt.plot(nraters,minimum)
+    plt.plot(nraters,maximum )
+    plt.plot(nraters,median )
+    plt.plot(nraters,mean )
+    plt.legend(['minimum','maximum','median','mean'])
+    plt.xlabel('n raters (bootstrapped - sampled with replacement)')
+    plt.ylabel("Matthew's correlation coefficient")
+    if teacher_id:title = 'teacher_id: ' + teacher_id
+    else: title = 'All teachers'
+    plt.title(title)
+    plt.grid()
+    plt.show()
+
+def plot_bootstrapped_mccs_per_teacher(d):
+    plt.clf()
+    nraters = list(range(1,52))
+    teacher_ids = d[1].keys()
+    for teacher_id in teacher_ids:
+        if teacher_id == None: continue
+        minimum, maximum, median, mean = get_mccs_boostrap_stats(d,
+            teacher_id, plot = False)
+        plt.plot(nraters,median, alpha = 0.4, color = 'blue' ,lw =1)
+    plt.xlabel('n raters (bootstrapped - sampled with replacement)')
+    plt.ylabel("Matthew's correlation coefficient")
+    plt.title('scores per teacher')
+    plt.grid()
+    plt.show()
+
+def good_bad_teacher_ids(d):
+    temp = d[40]
+    teacher_ids = temp.keys()
+    good, bad = [],[]
+    for teacher_id in teacher_ids:
+        v = np.median(temp[teacher_id]['mccs'])
+        if v < .4: bad.append(teacher_id)
+        else: good.append(teacher_id)
+    return good, bad
+    
+    
+    
+
             
