@@ -1,6 +1,7 @@
 import os
 from . import needleman_wunch
 from . import read_into_database
+from matplotlib import pyplot as plt
     
    
 
@@ -82,13 +83,45 @@ def replace_char_at_index(text, indices, char= '|'):
         t[index] = char
     return ''.join(t)
 
+def perc_correct_teacher_wav2vec_session(session, threshold = .6):
+    correct_list = []
+    for word in session.word_set.all():
+        if word.levenshtein_ratio >= threshold:
+            correct_list.append(1)
+        else: correct_list.append(0)
+    if len(correct_list) != 24: 
+        raise ValueError(len(correct_list),'unexpected')
+    teacher_correct_list = list(map(int,session.correct_list.split(',')))
+    teacher_perc = sum(teacher_correct_list) / len(teacher_correct_list)
+    wav2vec_perc = sum(correct_list) / len(correct_list)
+    return teacher_perc, wav2vec_perc, teacher_correct_list, correct_list
+
+def compute_perc_teacher_wav2vec_sessions(sessions = None, threshold = .6):
+    from texts.models import Session
+    if not sessions:
+        sessions = Session.objects.filter(all_incorrect = False, 
+            train_dev_test = 'train')
+    teacher_percs, wav2vec_percs = [], []
+    for session in sessions:
+        tp,wp,_,_ = perc_correct_teacher_wav2vec_session(session,threshold)
+        teacher_percs.append(tp)
+        wav2vec_percs.append(wp)
+    return teacher_percs, wav2vec_percs
+
+
+def plot_teacher_wav2vec_session_comparison(teacher_percs = None, 
+    wav2vec_percs = None,sessions = None, threshold =.6):
+    if teacher_percs == None: 
+        teacher_percs, wav2vec_percs = compute_perc_teacher_wav2vec_sessions(
+            sessions, threshold)
+    plt.clf()
+    plt.ion()
+    plt.scatter(teacher_percs,wav2vec_percs,alpha=.1)
+    plt.title('Percentage correct words')
+    plt.xlabel('rated by teachers')
+    plt.ylabel('rated by wav2vec 2.0, levenshtein ratio')
+    plt.show()
+
+
         
         
-    
-    
-    
-    
-    
-    
-    
-    
