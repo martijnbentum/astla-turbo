@@ -146,3 +146,7 @@ def print_aligned_text(word):
     print(hyp[start:end])
 
 
+
+    
+        
+
