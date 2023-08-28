@@ -1,6 +1,9 @@
 import os
 from . import needleman_wunch
 from . import read_into_database
+import random
+import pingouin as pg
+import pandas as pd
 from matplotlib import pyplot as plt
     
    
@@ -96,9 +99,22 @@ def perc_correct_teacher_wav2vec_session(session, threshold = .6):
     wav2vec_perc = sum(correct_list) / len(correct_list)
     return teacher_perc, wav2vec_perc, teacher_correct_list, correct_list
 
+def perc_correct_teacher_random_session(session, correct_chance= .72):
+    correct_list = []
+    for word in session.word_set.all():
+        if random.random() <= correct_chance:
+            correct_list.append(1)
+        else: correct_list.append(0)
+    if len(correct_list) != 24: 
+        raise ValueError(len(correct_list),'unexpected')
+    teacher_correct_list = list(map(int,session.correct_list.split(',')))
+    teacher_perc = sum(teacher_correct_list) / len(teacher_correct_list)
+    random_perc = sum(correct_list) / len(correct_list)
+    return teacher_perc, random_perc, teacher_correct_list, correct_list
+
 def compute_perc_teacher_wav2vec_sessions(sessions = None, threshold = .6):
-    from texts.models import Session
     if not sessions:
+        from texts.models import Session
         sessions = Session.objects.filter(all_incorrect = False, 
             train_dev_test = 'train')
     teacher_percs, wav2vec_percs = [], []
@@ -107,6 +123,19 @@ def compute_perc_teacher_wav2vec_sessions(sessions = None, threshold = .6):
         teacher_percs.append(tp)
         wav2vec_percs.append(wp)
     return teacher_percs, wav2vec_percs
+
+def compute_perc_teacher_random_sessions(sessions = None, correct_chance = .72):
+    if not sessions:
+        from texts.models import Session
+        sessions = Session.objects.filter(all_incorrect = False, 
+            train_dev_test = 'train')
+    teacher_percs, random_percs = [], []
+    for session in sessions:
+        tp,rp,_,_ = perc_correct_teacher_random_session(session,correct_chance)
+        teacher_percs.append(tp)
+        random_percs.append(rp)
+    return teacher_percs, random_percs
+
 
 
 def plot_teacher_wav2vec_session_comparison(teacher_percs = None, 
@@ -123,5 +152,34 @@ def plot_teacher_wav2vec_session_comparison(teacher_percs = None,
     plt.show()
 
 
+def plot_teacher_random_session_comparison(teacher_percs = None, 
+    random_percs = None,sessions = None, correct_chance=.72):
+    if teacher_percs == None: 
+        teacher_percs, random_percs = compute_perc_teacher_random_sessions(
+            sessions, correct_chance)
+    plt.clf()
+    plt.ion()
+    plt.scatter(teacher_percs,random_percs,alpha=.1)
+    plt.title('Percentage correct words')
+    plt.xlabel('rated by teachers')
+    plt.ylabel('rated by random word correct change ' + str(correct_chance))
+    plt.show()
         
+
+def compute_cronbach_alpha(sessions = None, threshold = .6, 
+    correct_chance = .72):
+    ''' compute the agreement between teacher and wav2vec word correct ratings
+    '''
+    teacher_percs, wav2vec_percs = compute_perc_teacher_wav2vec_sessions(
+        sessions,threshold)
+    tp, random_percs = compute_perc_teacher_random_sessions(sessions,
+        correct_chance)
+    assert teacher_percs == tp
+    df = pd.DataFrame({'teachers': teacher_percs, 'wav2vec':wav2vec_percs})
+    print("cronbach's alpha teachers vs wav2vec")
+    print(pg.cronbach_alpha(df))
+    rdf = pd.DataFrame({'teachers': teacher_percs, 'wav2vec':random_percs})
+    print("cronbach's alpha teachers vs random")
+    print(pg.cronbach_alpha(rdf))
+    
         
